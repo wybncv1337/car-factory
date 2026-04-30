@@ -1,0 +1,51 @@
+# Виртуальное окружение
+.venv/
+venv/
+ENV/
+
+# Кэш Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# VS Code
+.vscode/
+
+# База данных
+*.db
+car_factory.db
+
+# Данные
+/data/raw/*
+/data/cleaned/*
+/data/input/*
+/data/test/*
+/data/output/*
+!data/raw/.gitkeep
+!data/cleaned/.gitkeep
+!data/input/.gitkeep
+!data/test/.gitkeep
+!data/output/.gitkeep
+
+# Результаты
+/results/*
+!results/.gitkeep
+
+# Логи
+/logs/*
+!logs/.gitkeep
+
+# Временные файлы
+*.log
+*.tmp
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+car_factory.db
+cache/
+results/
+*.log
+.DS_Store

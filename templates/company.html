@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-building"></i> <span id="companyName">{{ company }}</span></h2>
+        <div>
+            <button class="btn btn-success btn-export" onclick="exportCompanyCSV()">
+                <i class="fas fa-file-csv"></i> Экспорт CSV
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4" id="statsCards"></div>
+
+    <!-- Filters -->
+    <div class="filter-card">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Категория</label>
+                <select id="filterCategory" class="form-select">
+                    <option value="all">Все</option>
+                    <option value="vacancy">Вакансии</option>
+                    <option value="release">Релизы</option>
+                    <option value="price">Цены</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Сортировать по</label>
+                <select id="sortBy" class="form-select">
+                    <option value="date">Дате</option>
+                    <option value="confidence">Уверенности</option>
+                    <option value="type">Типу</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Порядок</label>
+                <select id="sortOrder" class="form-select">
+                    <option value="desc">По убыванию</option>
+                    <option value="asc">По возрастанию</option>
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button class="btn btn-primary" onclick="loadCompanyFacts()">
+                    <i class="fas fa-search"></i> Применить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Facts List -->
+    <h4 class="mt-4 mb-3">Факты о компании</h4>
+    <div id="factsList"></div>
+</div>
+
+<script>
+const companyName = '{{ company }}';
+
+function loadCompanyFacts() {
+    const category = $('#filterCategory').val();
+    const sortBy = $('#sortBy').val();
+    const order = $('#sortOrder').val();
+
+    $.get(`/api/company/${encodeURIComponent(companyName)}?category=${category}&sort_by=${sortBy}&order=${order}`, function(data) {
+        displayStats(data.stats);
+        displayFacts(data.facts);
+        $('#companyName').text(data.company);
+    });
+}
+
+function displayStats(stats) {
+    const container = $('#statsCards');
+    container.html(`
+        <div class="col-md-3">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="text-muted">Всего фактов</h5>
+                            <h2 class="mb-0">${stats.total}</h2>
+                        </div>
+                        <div class="stat-icon bg-primary bg-opacity-10">
+                            <i class="fas fa-database text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="text-muted">Вакансии</h5>
+                            <h2 class="mb-0">${stats.vacancies}</h2>
+                        </div>
+                        <div class="stat-icon bg-success bg-opacity-10">
+                            <i class="fas fa-user-tie text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="text-muted">Релизы</h5>
+                            <h2 class="mb-0">${stats.releases}</h2>
+                        </div>
+                        <div class="stat-icon bg-danger bg-opacity-10">
+                            <i class="fas fa-car text-danger"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="text-muted">Цены</h5>
+                            <h2 class="mb-0">${stats.prices}</h2>
+                        </div>
+                        <div class="stat-icon bg-warning bg-opacity-10">
+                            <i class="fas fa-tag text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+}
+
+function displayFacts(facts) {
+    const container = $('#factsList');
+    container.empty();
+
+    if (facts.length === 0) {
+        container.html('<div class="alert alert-info">Факты не найдены</div>');
+        return;
+    }
+
+    facts.forEach(fact => {
+        const confidenceClass = fact.confidence >= 0.9 ? 'badge-confidence-high' :
+                                fact.confidence >= 0.7 ? 'badge-confidence-medium' : 'badge-confidence-low';
+        const typeIcon = fact.type === 'vacancy' ? 'fa-user-tie' :
+                         fact.type === 'release' ? 'fa-car' : 'fa-tag';
+        const typeName = fact.type === 'vacancy' ? 'Вакансия' :
+                         fact.type === 'release' ? 'Релиз' : 'Цена';
+
+        const value = fact.data.value || fact.data.position || fact.data.amount || '—';
+
+        const card = `
+            <div class="fact-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <span class="badge bg-primary me-2">${typeName}</span>
+                        <span class="badge ${confidenceClass}">confidence: ${Math.round(fact.confidence * 100)}%</span>
+                    </div>
+                    <small class="text-muted">${new Date(fact.created_at).toLocaleString()}</small>
+                </div>
+                <div class="mt-2">
+                    <i class="fas ${typeIcon} me-2 text-primary"></i>
+                    <strong>${value}</strong>
+                </div>
+                ${fact.source_url ? `<small class="text-muted"><i class="fas fa-link"></i> Источник: ${fact.source_url}</small>` : ''}
+            </div>
+        `;
+        container.append(card);
+    });
+}
+
+function exportCompanyCSV() {
+    window.location.href = `/api/facts/export/csv?company=${encodeURIComponent(companyName)}`;
+}
+
+$(document).ready(function() {
+    loadCompanyFacts();
+});
+</script>
+{% endblock %}

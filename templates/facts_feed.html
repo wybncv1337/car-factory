@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="p-4">
+    <h2 class="mb-4">Лента фактов</h2>
+
+    <div class="filter-card">
+        <div class="row">
+            <div class="col-md-3">
+                <label>Тип</label>
+                <select id="filterType" class="form-select">
+                    <option value="">Все</option>
+                    <option value="vacancy">Вакансии</option>
+                    <option value="release">Релизы</option>
+                    <option value="price">Цены</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label>Компания</label>
+                <input type="text" id="filterCompany" class="form-control" placeholder="Компания">
+            </div>
+            <div class="col-md-2">
+                <label>&nbsp;</label>
+                <button class="btn btn-primary w-100" onclick="loadFacts()">Поиск</button>
+            </div>
+            <div class="col-md-2">
+                <label>&nbsp;</label>
+                <button class="btn btn-success w-100" onclick="exportCSV()">Экспорт CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="factsList"></div>
+    <div id="pagination" class="mt-3 text-center"></div>
+</div>
+
+<script>
+let currentPage = 1;
+let totalPages = 1;
+
+async function loadFacts() {
+    const type = document.getElementById('filterType').value;
+    const company = document.getElementById('filterCompany').value;
+    const offset = (currentPage - 1) * 20;
+
+    let url = `/api/facts?limit=20&offset=${offset}`;
+    if (type) url += `&type=${type}`;
+    if (company) url += `&company=${company}`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        totalPages = data.total_pages || 1;
+
+        const container = document.getElementById('factsList');
+        container.innerHTML = '';
+
+        if (data.facts && data.facts.length > 0) {
+            data.facts.forEach(fact => {
+                let value = fact.data?.value || 'Нет данных';
+                const card = document.createElement('div');
+                card.className = 'fact-card';
+                card.innerHTML = `
+                    <small class="text-muted">${fact.created_at?.slice(0, 10) || ''}</small>
+                    <div class="mt-2">${value.substring(0, 200)}</div>
+                `;
+                container.appendChild(card);
+            });
+        } else {
+            container.innerHTML = '<div class="alert alert-info">Факты не найдены</div>';
+        }
+
+        // Пагинация
+        const pagination = document.getElementById('pagination');
+        pagination.innerHTML = '';
+        if (totalPages > 1) {
+            let html = '<nav><ul class="pagination justify-content-center">';
+            for (let i = 1; i <= Math.min(totalPages, 5); i++) {
+                html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                            <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>
+                         </li>`;
+            }
+            html += '</ul></nav>';
+            pagination.innerHTML = html;
+        }
+
+    } catch (error) {
+        console.error(error);
+        document.getElementById('factsList').innerHTML = '<div class="alert alert-danger">Ошибка загрузки</div>';
+    }
+}
+
+function goToPage(page) {
+    currentPage = page;
+    loadFacts();
+}
+
+function exportCSV() {
+    const company = document.getElementById('filterCompany').value;
+    let url = '/api/facts/export/csv';
+    if (company) url += `?company=${company}`;
+    window.location.href = url;
+}
+
+document.addEventListener('DOMContentLoaded', loadFacts);
+</script>
+{% endblock %}

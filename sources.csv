@@ -1,0 +1,10 @@
+company,type,url,name
+Volkswagen,html,https://volkswagen-russia.ru/,Официальный сайт
+Volkswagen,rss,https://www.volkswagen-newsroom.com/rss,Новости RSS
+Volkswagen,html,https://jobs.volkswagen-group.com/,Вакансии
+Toyota,html,https://www.toyota.ru/,Официальный сайт
+Toyota,rss,https://www.toyota.ru/rss/news.xml,Новости RSS
+BMW,html,https://www.bmw.ru/,Официальный сайт
+BMW,rss,https://www.bmwgroup.com/en/news/rss,Новости RSS
+Tesla,html,https://www.tesla.com/,Официальный сайт
+Tesla,html,https://www.tesla.com/careers,Вакансии

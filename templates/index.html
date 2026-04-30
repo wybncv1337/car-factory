@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="p-4">
+    <h2 class="mb-4">Dashboard</h2>
+
+    <!-- Stats Cards -->
+    <div class="row" id="stats">
+        <div class="col-md-3 mb-3">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted">Всего документов</h6>
+                            <h2 id="totalDocs" class="text-primary mb-0">0</h2>
+                        </div>
+                        <div class="stat-icon bg-primary bg-opacity-10">
+                            <i class="fas fa-file-alt text-primary fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted">Вакансии</h6>
+                            <h2 id="totalVacancies" class="text-success mb-0">0</h2>
+                        </div>
+                        <div class="stat-icon bg-success bg-opacity-10">
+                            <i class="fas fa-user-tie text-success fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted">Релизы</h6>
+                            <h2 id="totalReleases" class="text-danger mb-0">0</h2>
+                        </div>
+                        <div class="stat-icon bg-danger bg-opacity-10">
+                            <i class="fas fa-car text-danger fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted">Алерты</h6>
+                            <h2 id="totalAlerts" class="text-warning mb-0">0</h2>
+                        </div>
+                        <div class="stat-icon bg-warning bg-opacity-10">
+                            <i class="fas fa-bell text-warning fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="filter-card">
+        <h5><i class="fas fa-chart-line"></i> Динамика новостей</h5>
+        <div id="newsChart" style="height: 400px;"></div>
+    </div>
+
+    <!-- Recent Facts -->
+    <div class="filter-card">
+        <h5><i class="fas fa-clock"></i> Последние факты</h5>
+        <div id="factsList"></div>
+    </div>
+</div>
+
+<script>
+async function loadDashboard() {
+    console.log("Loading dashboard...");
+
+    try {
+        // Загружаем метрики
+        const metricsRes = await fetch('/api/metrics');
+        const metrics = await metricsRes.json();
+        console.log("Metrics loaded:", metrics);
+
+        document.getElementById('totalDocs').textContent = metrics.total_docs || 0;
+        document.getElementById('totalVacancies').textContent = metrics.total_vacancies || 0;
+        document.getElementById('totalReleases').textContent = metrics.total_releases || 0;
+        document.getElementById('totalAlerts').textContent = metrics.total_alerts || 0;
+
+        // Рисуем график
+        if (metrics.daily_stats && metrics.daily_stats.length > 0) {
+            const dates = metrics.daily_stats.map(d => d.date);
+            const counts = metrics.daily_stats.map(d => d.count);
+
+            const trace = {
+                x: dates,
+                y: counts,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Новости',
+                line: { color: '#667eea', width: 3 },
+                marker: { size: 8, color: '#764ba2' }
+            };
+
+            const layout = {
+                title: '',
+                xaxis: { title: 'Дата', tickangle: -45 },
+                yaxis: { title: 'Количество' },
+                plot_bgcolor: 'white',
+                paper_bgcolor: 'white',
+                margin: { t: 10, b: 80, l: 50, r: 30 },
+                hovermode: 'closest'
+            };
+
+            Plotly.newPlot('newsChart', [trace], layout, { responsive: true });
+        } else {
+            document.getElementById('newsChart').innerHTML = '<p class="text-muted text-center py-5">Нет данных для графика</p>';
+        }
+
+    } catch (error) {
+        console.error("Error loading metrics:", error);
+    }
+
+    try {
+        // Загружаем последние факты
+        const factsRes = await fetch('/api/facts?limit=10');
+        const factsData = await factsRes.json();
+        console.log("Facts loaded:", factsData.facts?.length || 0);
+
+        const container = document.getElementById('factsList');
+        container.innerHTML = '';
+
+        if (factsData.facts && factsData.facts.length > 0) {
+            factsData.facts.forEach(fact => {
+                const value = fact.data?.value || 'Нет данных';
+                const date = fact.created_at ? fact.created_at.slice(0, 10) : '';
+
+                const card = document.createElement('div');
+                card.className = 'fact-card';
+                card.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <small class="text-muted">📅 ${date}</small>
+                        <small class="text-muted">🎯 confidence: ${Math.round((fact.confidence || 0.5) * 100)}%</small>
+                    </div>
+                    <div class="mt-2">
+                        <strong>${escapeHtml(value.substring(0, 200))}</strong>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        } else {
+            container.innerHTML = '<p class="text-muted text-center py-3">Нет данных</p>';
+        }
+
+    } catch (error) {
+        console.error("Error loading facts:", error);
+        document.getElementById('factsList').innerHTML = '<div class="alert alert-danger">Ошибка загрузки фактов</div>';
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Загружаем при загрузке страницы
+document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+{% endblock %}

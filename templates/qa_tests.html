@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="p-4">
+    <h2 class="mb-4"><i class="fas fa-vial"></i> QA Тесты</h2>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="filter-card">
+                <h5><i class="fas fa-globe"></i> API Тесты</h5>
+                <div id="apiTestResults"></div>
+                <button class="btn btn-primary mt-3" onclick="runAPITests()">
+                    <i class="fas fa-play"></i> Запустить API тесты
+                </button>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="filter-card">
+                <h5><i class="fas fa-exclamation-triangle"></i> Поиск плохих источников</h5>
+                <div id="badSourcesResults"></div>
+                <button class="btn btn-warning mt-3" onclick="checkBadSources()">
+                    <i class="fas fa-search"></i> Найти плохие источники
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="filter-card mt-4">
+        <h5><i class="fas fa-check-circle"></i> Smoke UI Тесты</h5>
+        <div id="smokeTestResults"></div>
+        <button class="btn btn-success mt-3" onclick="runSmokeUITests()">
+            <i class="fas fa-play"></i> Запустить Smoke UI тесты
+        </button>
+    </div>
+</div>
+
+<script>
+function runAPITests() {
+    const results = $('#apiTestResults');
+    results.html('<div class="spinner-border spinner-border-sm"></div> Запуск тестов...');
+
+    const tests = [
+        { name: 'GET /api/metrics', url: '/api/metrics' },
+        { name: 'GET /api/facts', url: '/api/facts' },
+        { name: 'GET /api/alerts', url: '/api/alerts' },
+        { name: 'GET /api/weekly-summary', url: '/api/weekly-summary' },
+        { name: 'GET /api/companies', url: '/api/companies' }
+    ];
+
+    let passed = 0;
+    let html = '<div class="list-group">';
+
+    tests.forEach(test => {
+        $.get(test.url)
+            .done(function(data) {
+                passed++;
+                html += `<div class="list-group-item list-group-item-success">
+                            <i class="fas fa-check-circle text-success"></i> ${test.name} - OK
+                         </div>`;
+            })
+            .fail(function() {
+                html += `<div class="list-group-item list-group-item-danger">
+                            <i class="fas fa-times-circle text-danger"></i> ${test.name} - FAILED
+                         </div>`;
+            })
+            .always(function() {
+                results.html(html + `</div><p class="mt-2">Результат: ${passed}/${tests.length} пройдено</p>`);
+            });
+    });
+}
+
+function checkBadSources() {
+    const results = $('#badSourcesResults');
+    results.html('<div class="spinner-border spinner-border-sm"></div> Поиск...');
+
+    $.get('/api/qa/test-bad-sources', function(data) {
+        let html = `<div class="alert ${data.bad_sources_count > 0 ? 'alert-warning' : 'alert-success'}">
+                        Найдено ${data.bad_sources_count} плохих источников
+                    </div>`;
+
+        if (data.bad_sources.length > 0) {
+            html += '<div class="list-group">';
+            data.bad_sources.forEach(source => {
+                html += `<div class="list-group-item">
+                            <i class="fas fa-link"></i> ${source.url || 'no URL'}
+                            <span class="badge bg-danger">${source.content_length} символов</span>
+                         </div>`;
+            });
+            html += '</div>';
+        }
+
+        results.html(html);
+    });
+}
+
+function runSmokeUITests() {
+    const results = $('#smokeTestResults');
+    results.html('<div class="spinner-border spinner-border-sm"></div> Запуск Smoke тестов...');
+
+    const pages = ['/', '/facts-feed', '/alerts', '/weekly-summary', '/qa-tests'];
+    let passed = 0;
+    let html = '<div class="list-group">';
+
+    pages.forEach(page => {
+        $.get(page)
+            .done(function() {
+                passed++;
+                html += `<div class="list-group-item list-group-item-success">
+                            <i class="fas fa-check-circle"></i> Страница ${page} загружена
+                         </div>`;
+            })
+            .fail(function() {
+                html += `<div class="list-group-item list-group-item-danger">
+                            <i class="fas fa-times-circle"></i> Страница ${page} НЕ загружена
+                         </div>`;
+            })
+            .always(function() {
+                results.html(html + `</div><p class="mt-2">Результат: ${passed}/${pages.length} страниц загружено</p>`);
+            });
+    });
+}
+
+$(document).ready(function() {
+    runAPITests();
+});
+</script>
+{% endblock %}

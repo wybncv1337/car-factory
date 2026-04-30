@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="p-4">
+    <h2 class="mb-4"><i class="fas fa-chart-line"></i> Сводка за неделю</h2>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4" id="statsCards"></div>
+
+    <!-- Chart -->
+    <div class="filter-card mb-4">
+        <h5>Динамика новостей по дням</h5>
+        <div id="newsChart" style="height: 300px;"></div>
+    </div>
+
+    <!-- Top Companies -->
+    <div class="filter-card">
+        <h5>Топ компаний по упоминаниям</h5>
+        <div id="topCompaniesList"></div>
+    </div>
+</div>
+
+<script>
+function loadWeeklySummary() {
+    $.get('/api/weekly-summary', function(data) {
+        displayStats(data);
+        displayChart(data);
+        displayTopCompanies(data.top_companies);
+
+        $('#periodInfo').text(`${data.period.start} — ${data.period.end}`);
+    });
+}
+
+function displayStats(data) {
+    const container = $('#statsCards');
+    container.html(`
+        <div class="col-md-3">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="text-muted">Новые вакансии</h5>
+                            <h2 class="mb-0 text-success">+${data.new_vacancies}</h2>
+                        </div>
+                        <div class="stat-icon bg-success bg-opacity-10">
+                            <i class="fas fa-user-tie text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="text-muted">Новые релизы</h5>
+                            <h2 class="mb-0 text-danger">+${data.new_releases}</h2>
+                        </div>
+                        <div class="stat-icon bg-danger bg-opacity-10">
+                            <i class="fas fa-car text-danger"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="text-muted">Новые цены</h5>
+                            <h2 class="mb-0 text-warning">+${data.new_prices}</h2>
+                        </div>
+                        <div class="stat-icon bg-warning bg-opacity-10">
+                            <i class="fas fa-tag text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="text-muted">Срабатывания алертов</h5>
+                            <h2 class="mb-0 text-info">${data.alert_triggers}</h2>
+                        </div>
+                        <div class="stat-icon bg-info bg-opacity-10">
+                            <i class="fas fa-bell text-info"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+}
+
+function displayChart(data) {
+    const dates = data.news_by_day.map(d => d.date);
+    const counts = data.news_by_day.map(d => d.count);
+
+    const trace = {
+        x: dates,
+        y: counts,
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: 'Новости',
+        line: { color: '#667eea', width: 3 },
+        marker: { size: 8, color: '#764ba2' }
+    };
+
+    const layout = {
+        title: '',
+        xaxis: { title: 'Дата' },
+        yaxis: { title: 'Количество новостей' },
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white'
+    };
+
+    Plotly.newPlot('newsChart', [trace], layout);
+}
+
+function displayTopCompanies(companies) {
+    const container = $('#topCompaniesList');
+    container.empty();
+
+    if (companies.length === 0) {
+        container.html('<p>Нет данных</p>');
+        return;
+    }
+
+    let html = '<div class="list-group">';
+    companies.forEach(company => {
+        html += `
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <a href="/company/${encodeURIComponent(company.name)}" class="text-decoration-none">
+                    <i class="fas fa-building me-2 text-primary"></i> ${company.name}
+                </a>
+                <span class="badge bg-primary rounded-pill">${company.count} упоминаний</span>
+            </div>
+        `;
+    });
+    html += '</div>';
+    container.html(html);
+}
+
+$(document).ready(function() {
+    loadWeeklySummary();
+});
+</script>
+{% endblock %}

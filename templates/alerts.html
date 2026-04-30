@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="p-4">
+    <h2 class="mb-4"><i class="fas fa-bell"></i> Управление алертами</h2>
+
+    <!-- Create Alert Form -->
+    <div class="filter-card mb-4">
+        <h5 class="mb-3">Создать новый алерт</h5>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <input type="text" id="alertName" class="form-control" placeholder="Название алерта">
+            </div>
+            <div class="col-md-3">
+                <input type="text" id="alertCompany" class="form-control" placeholder="Компания (опционально)">
+            </div>
+            <div class="col-md-2">
+                <select id="alertType" class="form-select">
+                    <option value="">Любой тип</option>
+                    <option value="vacancy">Вакансии</option>
+                    <option value="release">Релизы</option>
+                    <option value="price">Цены</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="text" id="alertKeywords" class="form-control" placeholder="Ключевые слова (через запятую)">
+            </div>
+            <div class="col-md-2">
+                <select id="alertLanguage" class="form-select">
+                    <option value="any">Любой язык</option>
+                    <option value="ru">Русский</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+            <div class="col-md-12">
+                <button class="btn btn-primary" onclick="createAlert()">
+                    <i class="fas fa-plus"></i> Создать алерт
+                </button>
+                <button class="btn btn-warning" onclick="checkAlerts()">
+                    <i class="fas fa-play"></i> Проверить алерты сейчас
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts List -->
+    <h5 class="mb-3">Ваши алерты</h5>
+    <div id="alertsList"></div>
+</div>
+
+<script>
+function loadAlerts() {
+    $.get('/api/alerts', function(alerts) {
+        displayAlerts(alerts);
+    });
+}
+
+function displayAlerts(alerts) {
+    const container = $('#alertsList');
+    container.empty();
+
+    if (alerts.length === 0) {
+        container.html('<div class="alert alert-info">У вас нет активных алертов</div>');
+        return;
+    }
+
+    alerts.forEach(alert => {
+        const statusClass = alert.is_active ? 'success' : 'secondary';
+        const statusText = alert.is_active ? 'Активен' : 'Неактивен';
+
+        const card = `
+            <div class="fact-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h5 class="mb-1">${alert.name}</h5>
+                        ${alert.company ? `<span class="badge bg-info me-1">${alert.company}</span>` : ''}
+                        ${alert.type ? `<span class="badge bg-primary me-1">${alert.type}</span>` : ''}
+                        ${alert.keywords.length ? `<span class="badge bg-secondary">${alert.keywords.join(', ')}</span>` : ''}
+                    </div>
+                    <div>
+                        <span class="badge bg-${statusClass} me-2">${statusText}</span>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteAlert(${alert.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">
+                        Создан: ${new Date(alert.created_at).toLocaleString()}
+                        ${alert.last_triggered_at ? `<br>Последнее срабатывание: ${new Date(alert.last_triggered_at).toLocaleString()}` : ''}
+                    </small>
+                </div>
+            </div>
+        `;
+        container.append(card);
+    });
+}
+
+function createAlert() {
+    const name = $('#alertName').val();
+    if (!name) {
+        alert('Введите название алерта');
+        return;
+    }
+
+    const alertData = {
+        name: name,
+        company: $('#alertCompany').val() || null,
+        type: $('#alertType').val() || null,
+        keywords: $('#alertKeywords').val() ? $('#alertKeywords').val().split(',') : [],
+        language: $('#alertLanguage').val()
+    };
+
+    $.ajax({
+        url: '/api/alerts',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(alertData),
+        success: function() {
+            $('#alertName').val('');
+            $('#alertCompany').val('');
+            $('#alertType').val('');
+            $('#alertKeywords').val('');
+            loadAlerts();
+            showNotification('Алерт создан', 'success');
+        }
+    });
+}
+
+function deleteAlert(id) {
+    if (confirm('Удалить алерт?')) {
+        $.ajax({
+            url: `/api/alerts/${id}`,
+            type: 'DELETE',
+            success: function() {
+                loadAlerts();
+                showNotification('Алерт удален', 'success');
+            }
+        });
+    }
+}
+
+function checkAlerts() {
+    $.ajax({
+        url: '/api/alerts/check',
+        type: 'POST',
+        success: function(data) {
+            showNotification(`Проверка завершена. Найдено ${data.count} срабатываний`, 'info');
+            loadAlerts();
+        }
+    });
+}
+
+function showNotification(message, type) {
+    const alertDiv = $('<div class="alert alert-' + (type === 'success' ? 'success' : 'info') + ' alert-dismissible fade show">' +
+        message + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>');
+    $('.main-content .p-4').prepend(alertDiv);
+    setTimeout(() => alertDiv.alert('close'), 3000);
+}
+
+$(document).ready(function() {
+    loadAlerts();
+});
+</script>
+{% endblock %}
