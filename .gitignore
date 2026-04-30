@@ -14,7 +14,7 @@ dist/
 build/
 
 # Database
-# car_factory.db   # РАСКОММЕНТИРУЙ ЭТУ СТРОКУ если НЕ хочешь заливать БД на GitHub
+# car_factory.db
 *.db
 *.sqlite
 *.sqlite3
