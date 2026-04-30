@@ -6,6 +6,17 @@ from pathlib import Path
 from io import BytesIO, StringIO
 from flask import Flask, render_template, jsonify, request, send_file
 from flask_cors import CORS
+import os
+
+# Определяем путь к базе данных
+if os.environ.get('RENDER'):
+    # На Render используем постоянный диск
+    DB_PATH = '/opt/render/project/src/data/car_factory.db'
+    print(f"Running on Render, using DB: {DB_PATH}")
+else:
+    # Локально используем как обычно
+    DB_PATH = 'car_factory.db'
+    print(f"Running locally, using DB: {DB_PATH}")
 
 BASE_DIR = Path(__file__).parent
 TEMPLATES_DIR = BASE_DIR / 'templates'
