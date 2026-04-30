@@ -1,51 +1,60 @@
-# Виртуальное окружение
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 .venv/
 venv/
 ENV/
-
-# Кэш Python
-__pycache__/
-*.pyc
-.pytest_cache/
-
-# VS Code
-.vscode/
-
-# База данных
-*.db
-car_factory.db
-
-# Данные
-/data/raw/*
-/data/cleaned/*
-/data/input/*
-/data/test/*
-/data/output/*
-!data/raw/.gitkeep
-!data/cleaned/.gitkeep
-!data/input/.gitkeep
-!data/test/.gitkeep
-!data/output/.gitkeep
-
-# Результаты
-/results/*
-!results/.gitkeep
-
-# Логи
-/logs/*
-!logs/.gitkeep
-
-# Временные файлы
-*.log
-*.tmp
-
-__pycache__/
-*.pyc
-.venv/
-venv/
+env/
 .env
-car_factory.db
+*.egg-info/
+dist/
+build/
+
+# Database
+# car_factory.db   # РАСКОММЕНТИРУЙ ЭТУ СТРОКУ если НЕ хочешь заливать БД на GitHub
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache and logs
 cache/
 results/
 *.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Render specific
+.python-version
+*.pid
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
