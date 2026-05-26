@@ -11,11 +11,11 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="text-muted">Всего документов</h6>
-                            <h2 id="totalDocs" class="text-primary mb-0">0</h2>
+                            <h6 class="text-muted">Всего фактов</h6>
+                            <h2 id="totalFacts" class="text-primary mb-0">-</h2>
                         </div>
-                        <div class="stat-icon bg-primary bg-opacity-10">
-                            <i class="fas fa-file-alt text-primary fa-2x"></i>
+                        <div class="stat-icon bg-primary bg-opacity-10 p-3 rounded">
+                            <i class="fas fa-database text-primary fa-2x"></i>
                         </div>
                     </div>
                 </div>
@@ -27,9 +27,9 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="text-muted">Вакансии</h6>
-                            <h2 id="totalVacancies" class="text-success mb-0">0</h2>
+                            <h2 id="totalVacancies" class="text-success mb-0">-</h2>
                         </div>
-                        <div class="stat-icon bg-success bg-opacity-10">
+                        <div class="stat-icon bg-success bg-opacity-10 p-3 rounded">
                             <i class="fas fa-user-tie text-success fa-2x"></i>
                         </div>
                     </div>
@@ -42,9 +42,9 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <h6 class="text-muted">Релизы</h6>
-                            <h2 id="totalReleases" class="text-danger mb-0">0</h2>
+                            <h2 id="totalReleases" class="text-danger mb-0">-</h2>
                         </div>
-                        <div class="stat-icon bg-danger bg-opacity-10">
+                        <div class="stat-icon bg-danger bg-opacity-10 p-3 rounded">
                             <i class="fas fa-car text-danger fa-2x"></i>
                         </div>
                     </div>
@@ -56,11 +56,11 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="text-muted">Алерты</h6>
-                            <h2 id="totalAlerts" class="text-warning mb-0">0</h2>
+                            <h6 class="text-muted">Цены</h6>
+                            <h2 id="totalPrices" class="text-warning mb-0">-</h2>
                         </div>
-                        <div class="stat-icon bg-warning bg-opacity-10">
-                            <i class="fas fa-bell text-warning fa-2x"></i>
+                        <div class="stat-icon bg-warning bg-opacity-10 p-3 rounded">
+                            <i class="fas fa-tag text-warning fa-2x"></i>
                         </div>
                     </div>
                 </div>
@@ -68,14 +68,26 @@
         </div>
     </div>
 
-    <!-- Chart -->
-    <div class="filter-card">
-        <h5><i class="fas fa-chart-line"></i> Динамика новостей</h5>
-        <div id="newsChart" style="height: 400px;"></div>
+    <!-- Дневной график -->
+    <div class="filter-card mt-4">
+        <h5><i class="fas fa-chart-line"></i> Динамика фактов (последние 30 дней)</h5>
+        <div id="dailyChart" style="height: 400px;"></div>
     </div>
 
-    <!-- Recent Facts -->
-    <div class="filter-card">
+    <!-- Месячный график -->
+    <div class="filter-card mt-4">
+        <h5><i class="fas fa-chart-bar"></i> Динамика по месяцам</h5>
+        <div id="monthlyChart" style="height: 400px;"></div>
+    </div>
+
+    <!-- Круговая диаграмма -->
+    <div class="filter-card mt-4">
+        <h5><i class="fas fa-chart-pie"></i> Распределение по типам</h5>
+        <div id="typeChart" style="height: 400px;"></div>
+    </div>
+
+    <!-- Последние факты -->
+    <div class="filter-card mt-4">
         <h5><i class="fas fa-clock"></i> Последние факты</h5>
         <div id="factsList"></div>
     </div>
@@ -91,43 +103,20 @@ async function loadDashboard() {
         const metrics = await metricsRes.json();
         console.log("Metrics loaded:", metrics);
 
-        document.getElementById('totalDocs').textContent = metrics.total_docs || 0;
+        // Обновляем карточки
+        document.getElementById('totalFacts').textContent = metrics.total_facts || 0;
         document.getElementById('totalVacancies').textContent = metrics.total_vacancies || 0;
         document.getElementById('totalReleases').textContent = metrics.total_releases || 0;
-        document.getElementById('totalAlerts').textContent = metrics.total_alerts || 0;
+        document.getElementById('totalPrices').textContent = metrics.total_prices || 0;
 
-        // Рисуем график
-        if (metrics.daily_stats && metrics.daily_stats.length > 0) {
-            const dates = metrics.daily_stats.map(d => d.date);
-            const counts = metrics.daily_stats.map(d => d.count);
-
-            const trace = {
-                x: dates,
-                y: counts,
-                type: 'scatter',
-                mode: 'lines+markers',
-                name: 'Новости',
-                line: { color: '#667eea', width: 3 },
-                marker: { size: 8, color: '#764ba2' }
-            };
-
-            const layout = {
-                title: '',
-                xaxis: { title: 'Дата', tickangle: -45 },
-                yaxis: { title: 'Количество' },
-                plot_bgcolor: 'white',
-                paper_bgcolor: 'white',
-                margin: { t: 10, b: 80, l: 50, r: 30 },
-                hovermode: 'closest'
-            };
-
-            Plotly.newPlot('newsChart', [trace], layout, { responsive: true });
-        } else {
-            document.getElementById('newsChart').innerHTML = '<p class="text-muted text-center py-5">Нет данных для графика</p>';
-        }
+        // Рисуем графики
+        drawDailyChart(metrics.daily_stats);
+        drawMonthlyChart(metrics.monthly_stats);
+        drawPieChart(metrics.type_stats);
 
     } catch (error) {
         console.error("Error loading metrics:", error);
+        document.getElementById('stats').innerHTML = '<div class="alert alert-danger">Ошибка загрузки метрик</div>';
     }
 
     try {
@@ -141,15 +130,29 @@ async function loadDashboard() {
 
         if (factsData.facts && factsData.facts.length > 0) {
             factsData.facts.forEach(fact => {
-                const value = fact.data?.value || 'Нет данных';
-                const date = fact.created_at ? fact.created_at.slice(0, 10) : '';
+                let value = '';
+                if (fact.data && fact.data.value) {
+                    value = fact.data.value;
+                } else if (fact.data) {
+                    value = JSON.stringify(fact.data);
+                } else {
+                    value = 'Нет данных';
+                }
+
+                const typeIcon = fact.type === 'vacancy' ? 'fa-user-tie' : (fact.type === 'release' ? 'fa-car' : 'fa-tag');
+                const typeColor = fact.type === 'vacancy' ? 'success' : (fact.type === 'release' ? 'danger' : 'warning');
 
                 const card = document.createElement('div');
                 card.className = 'fact-card';
                 card.innerHTML = `
                     <div class="d-flex justify-content-between align-items-start">
-                        <small class="text-muted">📅 ${date}</small>
-                        <small class="text-muted">🎯 confidence: ${Math.round((fact.confidence || 0.5) * 100)}%</small>
+                        <div>
+                            <span class="badge bg-${typeColor} me-2">
+                                <i class="fas ${typeIcon}"></i> ${fact.type || 'fact'}
+                            </span>
+                            <span class="badge bg-secondary">confidence: ${Math.round((fact.confidence || 0.5) * 100)}%</span>
+                        </div>
+                        <small class="text-muted">${fact.created_at ? fact.created_at.slice(0, 10) : ''}</small>
                     </div>
                     <div class="mt-2">
                         <strong>${escapeHtml(value.substring(0, 200))}</strong>
@@ -167,6 +170,107 @@ async function loadDashboard() {
     }
 }
 
+function drawDailyChart(data) {
+    if (!data || data.length === 0) {
+        document.getElementById('dailyChart').innerHTML = '<p class="text-muted text-center py-5">Нет данных для графика</p>';
+        return;
+    }
+
+    const dates = data.map(d => d.date);
+    const counts = data.map(d => d.count);
+
+    const trace = {
+        x: dates,
+        y: counts,
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: 'Факты',
+        line: { color: '#667eea', width: 3 },
+        marker: { size: 6, color: '#764ba2' },
+        fill: 'tozeroy',
+        fillcolor: 'rgba(102, 126, 234, 0.1)'
+    };
+
+    const layout = {
+        title: '',
+        xaxis: { title: 'Дата', tickangle: -45 },
+        yaxis: { title: 'Количество' },
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white',
+        margin: { t: 10, b: 80, l: 50, r: 30 },
+        hovermode: 'closest'
+    };
+
+    Plotly.newPlot('dailyChart', [trace], layout, { responsive: true });
+}
+
+function drawMonthlyChart(data) {
+    if (!data || data.length === 0) {
+        document.getElementById('monthlyChart').innerHTML = '<p class="text-muted text-center py-5">Нет данных для графика</p>';
+        return;
+    }
+
+    const months = data.map(d => d.month);
+    const counts = data.map(d => d.count);
+
+    const trace = {
+        x: months,
+        y: counts,
+        type: 'bar',
+        name: 'Факты',
+        marker: {
+            color: '#764ba2',
+            line: { color: '#667eea', width: 1 }
+        }
+    };
+
+    const layout = {
+        title: '',
+        xaxis: { title: 'Месяц', tickangle: -45 },
+        yaxis: { title: 'Количество' },
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white',
+        margin: { t: 10, b: 80, l: 50, r: 30 }
+    };
+
+    Plotly.newPlot('monthlyChart', [trace], layout, { responsive: true });
+}
+
+function drawPieChart(data) {
+    if (!data || data.length === 0) {
+        document.getElementById('typeChart').innerHTML = '<p class="text-muted text-center py-5">Нет данных для диаграммы</p>';
+        return;
+    }
+
+    const labels = data.map(d => {
+        if (d.type === 'vacancy') return 'Вакансии';
+        if (d.type === 'release') return 'Релизы';
+        if (d.type === 'price') return 'Цены';
+        return d.type || 'Другое';
+    });
+    const values = data.map(d => d.count);
+    const colors = ['#28a745', '#dc3545', '#ffc107', '#6c757d'];
+
+    const trace = {
+        labels: labels,
+        values: values,
+        type: 'pie',
+        marker: { colors: colors.slice(0, labels.length) },
+        textinfo: 'label+percent',
+        hoverinfo: 'label+value+percent',
+        textposition: 'auto'
+    };
+
+    const layout = {
+        title: '',
+        height: 400,
+        showlegend: true,
+        legend: { orientation: 'h', y: -0.1 }
+    };
+
+    Plotly.newPlot('typeChart', [trace], layout, { responsive: true });
+}
+
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -175,5 +279,7 @@ function escapeHtml(text) {
 
 // Загружаем при загрузке страницы
 document.addEventListener('DOMContentLoaded', loadDashboard);
+// Обновляем каждые 5 минут
+setInterval(loadDashboard, 300000);
 </script>
 {% endblock %}
