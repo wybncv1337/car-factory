@@ -1,8 +1,6 @@
 import os
 import json
 import sqlite3
-import psycopg2
-from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, request, send_file
 from flask_cors import CORS
@@ -22,17 +20,14 @@ app = Flask(__name__,
             static_folder=str(STATIC_DIR))
 CORS(app)
 
-DATABASE_URL = os.environ.get('DATABASE_URL')
-IS_RENDER = DATABASE_URL is not None
+# Просто используем SQLite, без PostgreSQL
+DB_PATH = 'car_factory.db'
 
 
-def get_db_connection():
-    if DATABASE_URL:
-        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-    else:
-        conn = sqlite3.connect('car_factory.db')
-        conn.row_factory = sqlite3.Row
-        return conn
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 # ==================== СТРАНИЦЫ ====================
@@ -76,7 +71,7 @@ def qa_tests_page():
 
 @app.route('/api/metrics')
 def get_metrics():
-    conn = get_db_connection()
+    conn = get_db()
     cur = conn.cursor()
 
     try:
@@ -95,27 +90,26 @@ def get_metrics():
         cur.execute("SELECT COUNT(*) FROM alerts WHERE is_active = 1")
         total_alerts = cur.fetchone()[0] or 0
 
-        cur.execute("SELECT COUNT(*) FROM alert_triggers")
-        total_triggers = cur.fetchone()[0] or 0
-
         # Динамика по дням
         cur.execute('''
                     SELECT DATE (created_at) as date, COUNT (*) as count
                     FROM facts
-                    WHERE created_at >= DATE ('now', '-30 days')
+                    WHERE created_at IS NOT NULL
                     GROUP BY DATE (created_at)
-                    ORDER BY date
+                    ORDER BY date DESC
+                        LIMIT 30
                     ''')
-        daily_stats = [{'date': row['date'], 'count': row['count']} for row in cur.fetchall()]
+        daily_stats = []
+        for row in cur.fetchall():
+            daily_stats.append({'date': row['date'], 'count': row['count']})
 
     except Exception as e:
-        print(f"Error in /api/metrics: {e}")
+        print(f"Error: {e}")
         total_docs = 0
         total_vacancies = 0
         total_releases = 0
         total_prices = 0
         total_alerts = 0
-        total_triggers = 0
         daily_stats = []
 
     conn.close()
@@ -126,10 +120,7 @@ def get_metrics():
         'total_releases': total_releases,
         'total_prices': total_prices,
         'total_alerts': total_alerts,
-        'total_triggers': total_triggers,
-        'daily_stats': daily_stats,
-        'vacancies_timeline': [],
-        'releases_timeline': []
+        'daily_stats': daily_stats
     })
 
 
@@ -142,7 +133,7 @@ def get_facts():
     company = request.args.get('company')
     fact_type = request.args.get('type')
 
-    conn = get_db_connection()
+    conn = get_db()
     cur = conn.cursor()
 
     query = "SELECT * FROM facts"
@@ -150,8 +141,8 @@ def get_facts():
     conditions = []
 
     if company:
-        conditions.append("(fact_data LIKE ? OR fact_data LIKE ?)")
-        params.extend([f'%"{company}"%', f'%{company}%'])
+        conditions.append("fact_data LIKE ?")
+        params.append(f'%{company}%')
 
     if fact_type:
         conditions.append("type = ?")
@@ -160,12 +151,7 @@ def get_facts():
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
 
-    query += " ORDER BY id DESC"
-
-    if DATABASE_URL:
-        query += " LIMIT %s OFFSET %s"
-    else:
-        query += " LIMIT ? OFFSET ?"
+    query += " ORDER BY id DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
 
     cur.execute(query, params)
@@ -191,7 +177,9 @@ def get_facts():
     count_query = "SELECT COUNT(*) FROM facts"
     if conditions:
         count_query += " WHERE " + " AND ".join(conditions)
-    cur.execute(count_query, params[:len(params) - 2])
+        cur.execute(count_query, params[:len(params) - 2])
+    else:
+        cur.execute(count_query)
     total = cur.fetchone()[0] or 0
 
     conn.close()
@@ -209,15 +197,12 @@ def get_facts():
 
 @app.route('/api/companies')
 def get_companies():
-    conn = get_db_connection()
+    conn = get_db()
     cur = conn.cursor()
 
     companies = set()
 
-    cur.execute("SELECT fact_data FROM facts")
-
-    car_companies = ['Tesla', 'BMW', 'Toyota', 'АвтоВАЗ', 'Lada', 'Mercedes', 'Audi', 'Volkswagen',
-                     'Kia', 'Hyundai', 'Nissan', 'Ford', 'Honda', 'Porsche', 'Subaru', 'Mazda']
+    cur.execute("SELECT fact_data FROM facts LIMIT 200")
 
     for row in cur.fetchall():
         try:
@@ -227,6 +212,8 @@ def get_companies():
                 companies.add(data['company'])
 
             text = str(data.get('value', ''))
+            car_companies = ['Tesla', 'BMW', 'Toyota', 'Lada', 'Mercedes', 'Audi', 'Volkswagen', 'Kia', 'Hyundai',
+                             'Nissan']
             for company in car_companies:
                 if company.lower() in text.lower():
                     companies.add(company)
@@ -235,36 +222,21 @@ def get_companies():
 
     conn.close()
 
-    result = sorted(list(companies)) if companies else ['Tesla', 'BMW', 'Toyota', 'Mercedes', 'Audi']
+    result = sorted(list(companies)) if companies else ['Tesla', 'BMW', 'Toyota']
     return jsonify(result)
 
 
 @app.route('/api/company/<company_name>')
 def get_company_facts(company_name):
-    sort_by = request.args.get('sort_by', 'date')
-    order = request.args.get('order', 'desc')
-    category = request.args.get('category', 'all')
-
-    conn = get_db_connection()
+    conn = get_db()
     cur = conn.cursor()
 
-    query = "SELECT * FROM facts WHERE (fact_data LIKE ? OR fact_data LIKE ?)"
-    params = [f'%"{company_name}"%', f'%{company_name}%']
-
-    if category != 'all':
-        query += " AND type = ?"
-        params.append(category)
-
-    if sort_by == 'date':
-        query += " ORDER BY created_at " + order
-    elif sort_by == 'confidence':
-        query += " ORDER BY confidence " + order
-    elif sort_by == 'type':
-        query += " ORDER BY type " + order
-    else:
-        query += " ORDER BY created_at DESC"
-
-    cur.execute(query, params)
+    cur.execute('''
+                SELECT *
+                FROM facts
+                WHERE fact_data LIKE ?
+                ORDER BY created_at DESC
+                ''', (f'%{company_name}%',))
 
     facts = []
     for row in cur.fetchall():
@@ -295,225 +267,7 @@ def get_company_facts(company_name):
     return jsonify({
         'company': company_name,
         'stats': stats,
-        'facts': facts[:100]
-    })
-
-
-# ==================== API: АЛЕРТЫ ====================
-
-@app.route('/api/alerts', methods=['GET'])
-def get_alerts():
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    try:
-        if DATABASE_URL:
-            cur.execute("SELECT * FROM alerts ORDER BY created_at DESC")
-        else:
-            cur.execute("SELECT * FROM alerts ORDER BY created_at DESC")
-
-        alerts = []
-        for row in cur.fetchall():
-            alerts.append({
-                'id': row['id'],
-                'name': row['name'],
-                'company': row['company'],
-                'type': row['alert_type'],
-                'keywords': row['keywords'].split(',') if row['keywords'] else [],
-                'language': row['language'] or 'any',
-                'is_active': bool(row['is_active']),
-                'created_at': row['created_at'],
-                'last_triggered_at': row.get('last_triggered_at')
-            })
-    except:
-        alerts = []
-
-    conn.close()
-    return jsonify(alerts)
-
-
-@app.route('/api/alerts', methods=['POST'])
-def create_alert():
-    data = request.json
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    keywords = ','.join(data.get('keywords', [])) if isinstance(data.get('keywords'), list) else data.get('keywords',
-                                                                                                          '')
-
-    if DATABASE_URL:
-        cur.execute('''
-                    INSERT INTO alerts (name, company, alert_type, keywords, language, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    ''',
-                    (data.get('name'), data.get('company'), data.get('type'), keywords, data.get('language', 'any'),
-                     datetime.now()))
-    else:
-        cur.execute('''
-                    INSERT INTO alerts (name, company, alert_type, keywords, language, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    ''',
-                    (data.get('name'), data.get('company'), data.get('type'), keywords, data.get('language', 'any'),
-                     datetime.now()))
-
-    conn.commit()
-    alert_id = cur.lastrowid
-    conn.close()
-
-    return jsonify({'id': alert_id, 'message': 'Alert created'})
-
-
-@app.route('/api/alerts/<int:alert_id>', methods=['DELETE'])
-def delete_alert(alert_id):
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    if DATABASE_URL:
-        cur.execute("DELETE FROM alerts WHERE id = %s", (alert_id,))
-    else:
-        cur.execute("DELETE FROM alerts WHERE id = ?", (alert_id,))
-
-    conn.commit()
-    conn.close()
-    return jsonify({'message': 'Alert deleted'})
-
-
-# ==================== API: СВОДКА ЗА НЕДЕЛЮ ====================
-
-@app.route('/api/weekly-summary')
-def get_weekly_summary():
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=7)
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    news_by_day = []
-    try:
-        if DATABASE_URL:
-            cur.execute('''
-                        SELECT DATE (created_at) as date, COUNT (*) as count
-                        FROM facts
-                        WHERE created_at >= %s
-                        GROUP BY DATE (created_at)
-                        ORDER BY date
-                        ''', (start_date,))
-        else:
-            cur.execute('''
-                        SELECT DATE (created_at) as date, COUNT (*) as count
-                        FROM facts
-                        WHERE created_at >= ?
-                        GROUP BY DATE (created_at)
-                        ORDER BY date
-                        ''', (start_date,))
-
-        for row in cur.fetchall():
-            news_by_day.append({'date': row['date'], 'count': row['count']})
-    except:
-        pass
-
-    if DATABASE_URL:
-        cur.execute("SELECT COUNT(*) FROM facts WHERE created_at >= %s", (start_date,))
-    else:
-        cur.execute("SELECT COUNT(*) FROM facts WHERE created_at >= ?", (start_date,))
-    total_new = cur.fetchone()[0] or 0
-
-    try:
-        if DATABASE_URL:
-            cur.execute("SELECT COUNT(*) FROM alert_triggers WHERE triggered_at >= %s", (start_date,))
-        else:
-            cur.execute("SELECT COUNT(*) FROM alert_triggers WHERE triggered_at >= ?", (start_date,))
-        alert_triggers = cur.fetchone()[0] or 0
-    except:
-        alert_triggers = 0
-
-    conn.close()
-
-    return jsonify({
-        'period': {
-            'start': start_date.strftime('%Y-%m-%d'),
-            'end': end_date.strftime('%Y-%m-%d')
-        },
-        'news_by_day': news_by_day,
-        'new_vacancies': total_new // 3,
-        'new_releases': total_new // 3,
-        'new_prices': total_new // 3,
-        'alert_triggers': alert_triggers,
-        'top_companies': []
-    })
-
-
-# ==================== API: ЭКСПОРТ CSV ====================
-
-@app.route('/api/facts/export/csv')
-def export_facts_csv():
-    company = request.args.get('company')
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    if company:
-        if DATABASE_URL:
-            cur.execute("SELECT * FROM facts WHERE fact_data LIKE %s OR fact_data LIKE %s",
-                        (f'%"{company}"%', f'%{company}%'))
-        else:
-            cur.execute("SELECT * FROM facts WHERE fact_data LIKE ? OR fact_data LIKE ?",
-                        (f'%"{company}"%', f'%{company}%'))
-    else:
-        cur.execute("SELECT * FROM facts LIMIT 1000")
-
-    rows = cur.fetchall()
-
-    output = StringIO()
-    writer = csv.writer(output)
-
-    if rows:
-        headers = ['id', 'type', 'fact_data', 'confidence', 'created_at']
-        writer.writerow(headers)
-
-        for row in rows:
-            writer.writerow([row['id'], row['type'], row['fact_data'], row['confidence'], row['created_at']])
-
-    conn.close()
-
-    output.seek(0)
-    return send_file(
-        BytesIO(output.getvalue().encode('utf-8-sig')),
-        mimetype='text/csv',
-        as_attachment=True,
-        download_name=f'facts_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-    )
-
-
-# ==================== API: QA ТЕСТЫ ====================
-
-@app.route('/api/qa/test-bad-sources')
-def test_bad_sources():
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    if DATABASE_URL:
-        cur.execute(
-            "SELECT id, fact_data, LENGTH(fact_data) as len_content FROM facts WHERE fact_data IS NULL OR LENGTH(fact_data) < 50 LIMIT 15")
-    else:
-        cur.execute(
-            "SELECT id, fact_data, LENGTH(fact_data) as len_content FROM facts WHERE fact_data IS NULL OR LENGTH(fact_data) < 50 LIMIT 15")
-
-    bad_sources = []
-    for row in cur.fetchall():
-        bad_sources.append({
-            'id': row['id'],
-            'url': 'fact_' + str(row['id']),
-            'content_length': row['len_content'] or 0
-        })
-
-    conn.close()
-
-    return jsonify({
-        'bad_sources_count': len(bad_sources),
-        'bad_sources': bad_sources,
-        'message': f'Found {len(bad_sources)} potentially bad sources'
+        'facts': facts[:50]
     })
 
 
