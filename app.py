@@ -1,6 +1,7 @@
 import os
 import json
 import sqlite3
+import re
 from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, request, send_file
 from flask_cors import CORS
@@ -188,17 +189,40 @@ def get_facts():
     })
 
 
-# ==================== API: КОМПАНИИ (ИСПРАВЛЕНО) ====================
+# ==================== API: КОМПАНИИ (АВТОМАТИЧЕСКИЙ ПОИСК) ====================
 
-# Список известных автопроизводителей
-CAR_COMPANIES = [
-    'Tesla', 'BMW', 'Toyota', 'Mercedes', 'Audi', 'Volkswagen',
-    'Lada', 'АвтоВАЗ', 'Kia', 'Hyundai', 'Nissan', 'Ford',
-    'Honda', 'Porsche', 'Ferrari', 'Lamborghini', 'Maserati',
-    'Jaguar', 'Land Rover', 'Volvo', 'Subaru', 'Mazda', 'Mitsubishi',
-    'Renault', 'Peugeot', 'Citroen', 'Fiat', 'Skoda', 'Seat',
-    'Opel', 'Lexus', 'Infiniti', 'Acura', 'Alfa Romeo', 'Bentley',
-    'Rolls Royce', 'Aston Martin', 'McLaren', 'Bugatti', 'Koenigsegg'
+# Расширенный список известных автопроизводителей
+CAR_KEYWORDS = [
+    # Американские
+    'Tesla', 'Ford', 'General Motors', 'Chevrolet', 'Cadillac', 'GMC', 'Buick',
+    'Lincoln', 'Chrysler', 'Dodge', 'Jeep', 'Ram',
+    # Немецкие
+    'BMW', 'Mercedes', 'Mercedes-Benz', 'Audi', 'Volkswagen', 'Porsche', 'Opel',
+    'Smart', 'Mini', 'Maybach',
+    # Японские
+    'Toyota', 'Honda', 'Nissan', 'Mazda', 'Subaru', 'Mitsubishi', 'Suzuki',
+    'Lexus', 'Acura', 'Infiniti', 'Daihatsu', 'Isuzu',
+    # Корейские
+    'Hyundai', 'Kia', 'Genesis', 'SsangYong',
+    # Французские
+    'Renault', 'Peugeot', 'Citroen', 'DS', 'Bugatti',
+    # Итальянские
+    'Fiat', 'Ferrari', 'Lamborghini', 'Maserati', 'Alfa Romeo', 'Lancia',
+    'Pagani', 'Mazzanti',
+    # Британские
+    'Jaguar', 'Land Rover', 'Rolls Royce', 'Bentley', 'Aston Martin', 'McLaren',
+    'Lotus', 'Morgan', 'Caterham', 'Noble',
+    # Шведские
+    'Volvo', 'Polestar', 'Koenigsegg', 'Saab',
+    # Китайские
+    'BYD', 'Geely', 'Great Wall', 'Chery', 'Nio', 'Xpeng', 'Li Auto', 'Zeekr',
+    'Haval', 'Ora', 'Lynk', 'Polestar',
+    # Российские
+    'Lada', 'АвтоВАЗ', 'ГАЗ', 'УАЗ', 'КАМАЗ', 'Москвич', 'ЗИЛ',
+    # Индийские
+    'Tata', 'Mahindra', 'Maruti',
+    # Турецкие
+    'Togg',
 ]
 
 
@@ -215,23 +239,30 @@ def get_companies():
     for row in rows:
         try:
             data = json.loads(row['fact_data']) if row['fact_data'] else {}
-            fact_text = str(data.get('value', '')) + ' ' + str(data)
-
-            # Ищем компании в тексте
-            for company in CAR_COMPANIES:
-                if company.lower() in fact_text.lower():
-                    companies.add(company)
+            text = str(data.get('value', '')) + ' ' + str(data)
 
             # Проверяем поле company в JSON
             if 'company' in data and data['company']:
                 companies.add(data['company'])
+
+            # Ищем по ключевым словам
+            for kw in CAR_KEYWORDS:
+                if kw.lower() in text.lower():
+                    companies.add(kw)
+
+            # Ищем слова с заглавной буквы (потенциальные названия)
+            words = re.findall(r'\b[A-Z][a-z]{3,}\b', text)
+            for word in words:
+                if len(word) > 3 and word not in ['News', 'Press', 'Auto', 'Car']:
+                    companies.add(word)
 
         except:
             pass
 
     conn.close()
 
-    result = sorted(list(companies))
+    # Фильтруем и сортируем
+    result = sorted([c for c in companies if len(c) > 2])
     return jsonify(result)
 
 
