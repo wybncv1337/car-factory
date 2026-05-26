@@ -10,8 +10,6 @@ import csv
 from io import BytesIO, StringIO
 from pathlib import Path
 
-# ==================== КОНФИГУРАЦИЯ ====================
-
 BASE_DIR = Path(__file__).parent
 TEMPLATES_DIR = BASE_DIR / 'templates'
 STATIC_DIR = BASE_DIR / 'static'
@@ -24,252 +22,17 @@ app = Flask(__name__,
             static_folder=str(STATIC_DIR))
 CORS(app)
 
-# Определяем тип базы данных
 DATABASE_URL = os.environ.get('DATABASE_URL')
-IS_RENDER = os.environ.get('RENDER') == 'true'
+IS_RENDER = DATABASE_URL is not None
 
-
-# ==================== РАБОТА С БАЗОЙ ДАННЫХ ====================
 
 def get_db_connection():
-    """Универсальное подключение к БД (SQLite или PostgreSQL)"""
-
-    if DATABASE_URL and IS_RENDER:
-        # PostgreSQL на Render
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-        return conn
+    if DATABASE_URL:
+        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     else:
-        # SQLite локально
         conn = sqlite3.connect('car_factory.db')
         conn.row_factory = sqlite3.Row
         return conn
-
-
-def execute_query(cursor, query, params=None):
-    """Универсальное выполнение запроса (адаптирует ? под %s для PostgreSQL)"""
-    if DATABASE_URL and IS_RENDER:
-        # PostgreSQL
-        if params:
-            query = query.replace('?', '%s')
-            cursor.execute(query, params)
-        else:
-            cursor.execute(query)
-    else:
-        # SQLite
-        if params:
-            cursor.execute(query, params)
-        else:
-            cursor.execute(query)
-
-
-def init_db():
-    """Создаёт таблицы, если их нет"""
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    if DATABASE_URL and IS_RENDER:
-        # PostgreSQL
-        cur.execute('''
-                    CREATE TABLE IF NOT EXISTS facts
-                    (
-                        id
-                        SERIAL
-                        PRIMARY
-                        KEY,
-                        type
-                        TEXT,
-                        fact_data
-                        TEXT,
-                        confidence
-                        REAL,
-                        created_at
-                        TIMESTAMP
-                        DEFAULT
-                        CURRENT_TIMESTAMP
-                    )
-                    ''')
-        cur.execute('''
-                    CREATE TABLE IF NOT EXISTS alerts
-                    (
-                        id
-                        SERIAL
-                        PRIMARY
-                        KEY,
-                        name
-                        TEXT
-                        NOT
-                        NULL,
-                        company
-                        TEXT,
-                        alert_type
-                        TEXT,
-                        keywords
-                        TEXT,
-                        language
-                        TEXT
-                        DEFAULT
-                        'any',
-                        is_active
-                        INTEGER
-                        DEFAULT
-                        1,
-                        created_at
-                        TIMESTAMP
-                        DEFAULT
-                        CURRENT_TIMESTAMP
-                    )
-                    ''')
-        cur.execute('''
-                    CREATE TABLE IF NOT EXISTS alert_triggers
-                    (
-                        id
-                        SERIAL
-                        PRIMARY
-                        KEY,
-                        alert_id
-                        INTEGER,
-                        matched_doc_id
-                        INTEGER,
-                        matched_text
-                        TEXT,
-                        triggered_at
-                        TIMESTAMP
-                        DEFAULT
-                        CURRENT_TIMESTAMP
-                    )
-                    ''')
-    else:
-        # SQLite
-        cur.execute('''
-                    CREATE TABLE IF NOT EXISTS facts
-                    (
-                        id
-                        INTEGER
-                        PRIMARY
-                        KEY
-                        AUTOINCREMENT,
-                        type
-                        TEXT,
-                        fact_data
-                        TEXT,
-                        confidence
-                        REAL,
-                        created_at
-                        TIMESTAMP
-                        DEFAULT
-                        CURRENT_TIMESTAMP
-                    )
-                    ''')
-        cur.execute('''
-                    CREATE TABLE IF NOT EXISTS alerts
-                    (
-                        id
-                        INTEGER
-                        PRIMARY
-                        KEY
-                        AUTOINCREMENT,
-                        name
-                        TEXT
-                        NOT
-                        NULL,
-                        company
-                        TEXT,
-                        alert_type
-                        TEXT,
-                        keywords
-                        TEXT,
-                        language
-                        TEXT
-                        DEFAULT
-                        'any',
-                        is_active
-                        INTEGER
-                        DEFAULT
-                        1,
-                        created_at
-                        TIMESTAMP
-                        DEFAULT
-                        CURRENT_TIMESTAMP
-                    )
-                    ''')
-        cur.execute('''
-                    CREATE TABLE IF NOT EXISTS alert_triggers
-                    (
-                        id
-                        INTEGER
-                        PRIMARY
-                        KEY
-                        AUTOINCREMENT,
-                        alert_id
-                        INTEGER,
-                        matched_doc_id
-                        INTEGER,
-                        matched_text
-                        TEXT,
-                        triggered_at
-                        TIMESTAMP
-                        DEFAULT
-                        CURRENT_TIMESTAMP
-                    )
-                    ''')
-
-    conn.commit()
-    conn.close()
-
-    # Добавляем тестовые данные, если таблица пустая
-    seed_test_data()
-    print("✅ Database initialized")
-
-
-def seed_test_data():
-    """Добавляет тестовые данные, если таблица фактов пустая"""
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    # Проверяем, есть ли данные
-    execute_query(cur, "SELECT COUNT(*) as count FROM facts")
-    count = cur.fetchone()['count']
-
-    if count == 0:
-        test_data = [
-            ('release', '{"value":"Tesla выпустила новую модель Model 3", "company":"Tesla", "year":2024}', 0.95),
-            ('vacancy',
-             '{"value":"Открыта вакансия инженера в Tesla", "position":"Engineer", "salary":150000, "company":"Tesla"}',
-             0.92),
-            ('price',
-             '{"value":"Цена Tesla Model 3 — 3.5 млн руб.", "amount":3500000, "currency":"RUB", "company":"Tesla"}',
-             0.90),
-            ('release', '{"value":"BMW представила новый электромобиль iX5", "company":"BMW", "year":2024}', 0.94),
-            ('vacancy',
-             '{"value":"BMW seeks Senior Java Developer", "position":"Java Dev", "salary":140000, "company":"BMW"}',
-             0.91),
-            ('price', '{"value":"BMW iX5 price starts at $45,000", "amount":45000, "currency":"USD", "company":"BMW"}',
-             0.89),
-            ('release', '{"value":"Toyota представила новую Camry 2024", "company":"Toyota", "year":2024}', 0.93),
-            ('vacancy',
-             '{"value":"Toyota открывает вакансию механика", "position":"Mechanic", "salary":90000, "company":"Toyota"}',
-             0.88),
-            ('price',
-             '{"value":"Стоимость Toyota Camry от 2.8 млн руб.", "amount":2800000, "currency":"RUB", "company":"Toyota"}',
-             0.91),
-        ]
-
-        for fact_type, fact_data, confidence in test_data:
-            if DATABASE_URL and IS_RENDER:
-                cur.execute("INSERT INTO facts (type, fact_data, confidence) VALUES (%s, %s, %s)",
-                            (fact_type, fact_data, confidence))
-            else:
-                cur.execute("INSERT INTO facts (type, fact_data, confidence) VALUES (?, ?, ?)",
-                            (fact_type, fact_data, confidence))
-
-        conn.commit()
-        print(f"✅ Added {len(test_data)} test records")
-
-    conn.close()
-
-
-# Инициализируем БД при запуске
-init_db()
 
 
 # ==================== СТРАНИЦЫ ====================
@@ -317,51 +80,51 @@ def get_metrics():
     cur = conn.cursor()
 
     try:
-        execute_query(cur, "SELECT COUNT(*) as count FROM facts")
-        total_facts = cur.fetchone()['count'] or 0
-    except:
-        total_facts = 0
+        cur.execute("SELECT COUNT(*) FROM facts")
+        total_docs = cur.fetchone()[0] or 0
 
-    try:
-        execute_query(cur, "SELECT COUNT(*) as count FROM alerts WHERE is_active = 1")
-        total_alerts = cur.fetchone()['count'] or 0
-    except:
+        cur.execute("SELECT COUNT(*) FROM facts WHERE type = 'vacancy'")
+        total_vacancies = cur.fetchone()[0] or 0
+
+        cur.execute("SELECT COUNT(*) FROM facts WHERE type = 'release'")
+        total_releases = cur.fetchone()[0] or 0
+
+        cur.execute("SELECT COUNT(*) FROM facts WHERE type = 'price'")
+        total_prices = cur.fetchone()[0] or 0
+
+        cur.execute("SELECT COUNT(*) FROM alerts WHERE is_active = 1")
+        total_alerts = cur.fetchone()[0] or 0
+
+        cur.execute("SELECT COUNT(*) FROM alert_triggers")
+        total_triggers = cur.fetchone()[0] or 0
+
+        # Динамика по дням
+        cur.execute('''
+                    SELECT DATE (created_at) as date, COUNT (*) as count
+                    FROM facts
+                    WHERE created_at >= DATE ('now', '-30 days')
+                    GROUP BY DATE (created_at)
+                    ORDER BY date
+                    ''')
+        daily_stats = [{'date': row['date'], 'count': row['count']} for row in cur.fetchall()]
+
+    except Exception as e:
+        print(f"Error in /api/metrics: {e}")
+        total_docs = 0
+        total_vacancies = 0
+        total_releases = 0
+        total_prices = 0
         total_alerts = 0
-
-    try:
-        execute_query(cur, "SELECT COUNT(*) as count FROM alert_triggers")
-        total_triggers = cur.fetchone()['count'] or 0
-    except:
         total_triggers = 0
-
-    # Подсчёт по типам (упрощённо)
-    vacancies = total_facts // 3
-    releases = total_facts // 3
-    prices = total_facts // 3
-
-    # Динамика по дням (последние 30 дней)
-    daily_stats = []
-    try:
-        execute_query(cur, '''
-                           SELECT DATE (created_at) as date, COUNT (*) as count
-                           FROM facts
-                           WHERE created_at IS NOT NULL
-                           GROUP BY DATE (created_at)
-                           ORDER BY date DESC
-                               LIMIT 30
-                           ''')
-        for row in cur.fetchall():
-            daily_stats.append({'date': row['date'], 'count': row['count']})
-    except:
-        pass
+        daily_stats = []
 
     conn.close()
 
     return jsonify({
-        'total_docs': total_facts,
-        'total_vacancies': vacancies,
-        'total_releases': releases,
-        'total_prices': prices,
+        'total_docs': total_docs,
+        'total_vacancies': total_vacancies,
+        'total_releases': total_releases,
+        'total_prices': total_prices,
         'total_alerts': total_alerts,
         'total_triggers': total_triggers,
         'daily_stats': daily_stats,
@@ -377,28 +140,35 @@ def get_facts():
     limit = request.args.get('limit', 20, type=int)
     offset = request.args.get('offset', 0, type=int)
     company = request.args.get('company')
+    fact_type = request.args.get('type')
 
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Базовый запрос
     query = "SELECT * FROM facts"
     params = []
+    conditions = []
 
     if company:
-        query += " WHERE fact_data LIKE ?"
-        params.append(f'%{company}%')
+        conditions.append("(fact_data LIKE ? OR fact_data LIKE ?)")
+        params.extend([f'%"{company}"%', f'%{company}%'])
+
+    if fact_type:
+        conditions.append("type = ?")
+        params.append(fact_type)
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
 
     query += " ORDER BY id DESC"
 
-    # Пагинация
-    if DATABASE_URL and IS_RENDER:
+    if DATABASE_URL:
         query += " LIMIT %s OFFSET %s"
     else:
         query += " LIMIT ? OFFSET ?"
     params.extend([limit, offset])
 
-    execute_query(cur, query, params)
+    cur.execute(query, params)
 
     facts = []
     for row in cur.fetchall():
@@ -414,18 +184,15 @@ def get_facts():
             'type': row['type'],
             'data': fact_data,
             'confidence': row['confidence'] or 0.5,
-            'created_at': row['created_at'],
-            'source_url': ''
+            'created_at': row['created_at']
         })
 
     # Общее количество
-    count_query = "SELECT COUNT(*) as count FROM facts"
-    if company:
-        count_query += " WHERE fact_data LIKE ?"
-        execute_query(cur, count_query, [f'%{company}%'])
-    else:
-        execute_query(cur, count_query)
-    total = cur.fetchone()['count'] or 0
+    count_query = "SELECT COUNT(*) FROM facts"
+    if conditions:
+        count_query += " WHERE " + " AND ".join(conditions)
+    cur.execute(count_query, params[:len(params) - 2])
+    total = cur.fetchone()[0] or 0
 
     conn.close()
 
@@ -447,32 +214,57 @@ def get_companies():
 
     companies = set()
 
-    execute_query(cur, "SELECT fact_data FROM facts LIMIT 100")
+    cur.execute("SELECT fact_data FROM facts")
+
+    car_companies = ['Tesla', 'BMW', 'Toyota', 'АвтоВАЗ', 'Lada', 'Mercedes', 'Audi', 'Volkswagen',
+                     'Kia', 'Hyundai', 'Nissan', 'Ford', 'Honda', 'Porsche', 'Subaru', 'Mazda']
+
     for row in cur.fetchall():
-        if row['fact_data']:
-            try:
-                data = json.loads(row['fact_data'])
-                company = data.get('company', '')
-                if company:
+        try:
+            data = json.loads(row['fact_data']) if row['fact_data'] else {}
+
+            if 'company' in data and data['company']:
+                companies.add(data['company'])
+
+            text = str(data.get('value', ''))
+            for company in car_companies:
+                if company.lower() in text.lower():
                     companies.add(company)
-            except:
-                pass
+        except:
+            pass
 
     conn.close()
 
-    # Если нет компаний в БД, возвращаем стандартные
-    if not companies:
-        companies = ['Tesla', 'BMW', 'Toyota', 'Mercedes', 'Kia']
-
-    return jsonify(sorted(list(companies)))
+    result = sorted(list(companies)) if companies else ['Tesla', 'BMW', 'Toyota', 'Mercedes', 'Audi']
+    return jsonify(result)
 
 
 @app.route('/api/company/<company_name>')
 def get_company_facts(company_name):
+    sort_by = request.args.get('sort_by', 'date')
+    order = request.args.get('order', 'desc')
+    category = request.args.get('category', 'all')
+
     conn = get_db_connection()
     cur = conn.cursor()
 
-    execute_query(cur, "SELECT * FROM facts WHERE fact_data LIKE ? ORDER BY id DESC", [f'%{company_name}%'])
+    query = "SELECT * FROM facts WHERE (fact_data LIKE ? OR fact_data LIKE ?)"
+    params = [f'%"{company_name}"%', f'%{company_name}%']
+
+    if category != 'all':
+        query += " AND type = ?"
+        params.append(category)
+
+    if sort_by == 'date':
+        query += " ORDER BY created_at " + order
+    elif sort_by == 'confidence':
+        query += " ORDER BY confidence " + order
+    elif sort_by == 'type':
+        query += " ORDER BY type " + order
+    else:
+        query += " ORDER BY created_at DESC"
+
+    cur.execute(query, params)
 
     facts = []
     for row in cur.fetchall():
@@ -488,11 +280,9 @@ def get_company_facts(company_name):
             'type': row['type'],
             'data': fact_data,
             'confidence': row['confidence'] or 0.5,
-            'created_at': row['created_at'],
-            'source_url': ''
+            'created_at': row['created_at']
         })
 
-    # Статистика по категориям
     stats = {
         'total': len(facts),
         'vacancies': len([f for f in facts if f['type'] == 'vacancy']),
@@ -505,7 +295,7 @@ def get_company_facts(company_name):
     return jsonify({
         'company': company_name,
         'stats': stats,
-        'facts': facts[:50]
+        'facts': facts[:100]
     })
 
 
@@ -517,11 +307,13 @@ def get_alerts():
     cur = conn.cursor()
 
     try:
-        execute_query(cur, "SELECT * FROM alerts ORDER BY created_at DESC")
-        rows = cur.fetchall()
+        if DATABASE_URL:
+            cur.execute("SELECT * FROM alerts ORDER BY created_at DESC")
+        else:
+            cur.execute("SELECT * FROM alerts ORDER BY created_at DESC")
 
         alerts = []
-        for row in rows:
+        for row in cur.fetchall():
             alerts.append({
                 'id': row['id'],
                 'name': row['name'],
@@ -550,7 +342,7 @@ def create_alert():
     keywords = ','.join(data.get('keywords', [])) if isinstance(data.get('keywords'), list) else data.get('keywords',
                                                                                                           '')
 
-    if DATABASE_URL and IS_RENDER:
+    if DATABASE_URL:
         cur.execute('''
                     INSERT INTO alerts (name, company, alert_type, keywords, language, created_at)
                     VALUES (%s, %s, %s, %s, %s, %s)
@@ -577,7 +369,7 @@ def delete_alert(alert_id):
     conn = get_db_connection()
     cur = conn.cursor()
 
-    if DATABASE_URL and IS_RENDER:
+    if DATABASE_URL:
         cur.execute("DELETE FROM alerts WHERE id = %s", (alert_id,))
     else:
         cur.execute("DELETE FROM alerts WHERE id = ?", (alert_id,))
@@ -597,10 +389,9 @@ def get_weekly_summary():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Новости за неделю
     news_by_day = []
     try:
-        if DATABASE_URL and IS_RENDER:
+        if DATABASE_URL:
             cur.execute('''
                         SELECT DATE (created_at) as date, COUNT (*) as count
                         FROM facts
@@ -622,20 +413,18 @@ def get_weekly_summary():
     except:
         pass
 
-    # Новые факты за неделю
-    if DATABASE_URL and IS_RENDER:
-        cur.execute("SELECT COUNT(*) as count FROM facts WHERE created_at >= %s", (start_date,))
+    if DATABASE_URL:
+        cur.execute("SELECT COUNT(*) FROM facts WHERE created_at >= %s", (start_date,))
     else:
-        cur.execute("SELECT COUNT(*) as count FROM facts WHERE created_at >= ?", (start_date,))
-    total_new = cur.fetchone()['count'] or 0
+        cur.execute("SELECT COUNT(*) FROM facts WHERE created_at >= ?", (start_date,))
+    total_new = cur.fetchone()[0] or 0
 
-    # Срабатывания алертов
     try:
-        if DATABASE_URL and IS_RENDER:
-            cur.execute("SELECT COUNT(*) as count FROM alert_triggers WHERE triggered_at >= %s", (start_date,))
+        if DATABASE_URL:
+            cur.execute("SELECT COUNT(*) FROM alert_triggers WHERE triggered_at >= %s", (start_date,))
         else:
-            cur.execute("SELECT COUNT(*) as count FROM alert_triggers WHERE triggered_at >= ?", (start_date,))
-        alert_triggers = cur.fetchone()['count'] or 0
+            cur.execute("SELECT COUNT(*) FROM alert_triggers WHERE triggered_at >= ?", (start_date,))
+        alert_triggers = cur.fetchone()[0] or 0
     except:
         alert_triggers = 0
 
@@ -659,10 +448,21 @@ def get_weekly_summary():
 
 @app.route('/api/facts/export/csv')
 def export_facts_csv():
+    company = request.args.get('company')
+
     conn = get_db_connection()
     cur = conn.cursor()
 
-    execute_query(cur, "SELECT * FROM facts LIMIT 1000")
+    if company:
+        if DATABASE_URL:
+            cur.execute("SELECT * FROM facts WHERE fact_data LIKE %s OR fact_data LIKE %s",
+                        (f'%"{company}"%', f'%{company}%'))
+        else:
+            cur.execute("SELECT * FROM facts WHERE fact_data LIKE ? OR fact_data LIKE ?",
+                        (f'%"{company}"%', f'%{company}%'))
+    else:
+        cur.execute("SELECT * FROM facts LIMIT 1000")
+
     rows = cur.fetchall()
 
     output = StringIO()
@@ -693,8 +493,7 @@ def test_bad_sources():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Ищем короткие записи
-    if DATABASE_URL and IS_RENDER:
+    if DATABASE_URL:
         cur.execute(
             "SELECT id, fact_data, LENGTH(fact_data) as len_content FROM facts WHERE fact_data IS NULL OR LENGTH(fact_data) < 50 LIMIT 15")
     else:
@@ -718,7 +517,6 @@ def test_bad_sources():
     })
 
 
-# ==================== ЗАПУСК ====================
-
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
