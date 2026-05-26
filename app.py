@@ -189,40 +189,24 @@ def get_facts():
     })
 
 
-# ==================== API: КОМПАНИИ (АВТОМАТИЧЕСКИЙ ПОИСК) ====================
+# ==================== API: КОМПАНИИ (ИСПРАВЛЕНО) ====================
 
-# Расширенный список известных автопроизводителей
-CAR_KEYWORDS = [
-    # Американские
-    'Tesla', 'Ford', 'General Motors', 'Chevrolet', 'Cadillac', 'GMC', 'Buick',
-    'Lincoln', 'Chrysler', 'Dodge', 'Jeep', 'Ram',
-    # Немецкие
-    'BMW', 'Mercedes', 'Mercedes-Benz', 'Audi', 'Volkswagen', 'Porsche', 'Opel',
-    'Smart', 'Mini', 'Maybach',
-    # Японские
-    'Toyota', 'Honda', 'Nissan', 'Mazda', 'Subaru', 'Mitsubishi', 'Suzuki',
-    'Lexus', 'Acura', 'Infiniti', 'Daihatsu', 'Isuzu',
-    # Корейские
-    'Hyundai', 'Kia', 'Genesis', 'SsangYong',
-    # Французские
-    'Renault', 'Peugeot', 'Citroen', 'DS', 'Bugatti',
-    # Итальянские
-    'Fiat', 'Ferrari', 'Lamborghini', 'Maserati', 'Alfa Romeo', 'Lancia',
-    'Pagani', 'Mazzanti',
-    # Британские
-    'Jaguar', 'Land Rover', 'Rolls Royce', 'Bentley', 'Aston Martin', 'McLaren',
-    'Lotus', 'Morgan', 'Caterham', 'Noble',
-    # Шведские
-    'Volvo', 'Polestar', 'Koenigsegg', 'Saab',
-    # Китайские
-    'BYD', 'Geely', 'Great Wall', 'Chery', 'Nio', 'Xpeng', 'Li Auto', 'Zeekr',
-    'Haval', 'Ora', 'Lynk', 'Polestar',
-    # Российские
-    'Lada', 'АвтоВАЗ', 'ГАЗ', 'УАЗ', 'КАМАЗ', 'Москвич', 'ЗИЛ',
-    # Индийские
-    'Tata', 'Mahindra', 'Maruti',
-    # Турецкие
-    'Togg',
+# Компании из двух слов (целиком)
+MULTI_WORD_COMPANIES = [
+    'Aston Martin', 'Alfa Romeo', 'Land Rover', 'Rolls Royce',
+    'General Motors', 'Great Wall', 'Li Auto', 'Lynk Co',
+    'Mercedes-Benz', 'Morgan Motor'
+]
+
+# Однословные компании (исключая те, что являются частями двухсловных)
+SINGLE_WORD_COMPANIES = [
+    'Tesla', 'BMW', 'Mercedes', 'Audi', 'Volkswagen', 'Porsche',
+    'Toyota', 'Honda', 'Nissan', 'Hyundai', 'Kia', 'Ford',
+    'Chevrolet', 'Cadillac', 'Volvo', 'Subaru', 'Mazda', 'Mitsubishi',
+    'Lexus', 'Acura', 'Infiniti', 'Jaguar', 'Ferrari', 'Lamborghini',
+    'Maserati', 'Bugatti', 'McLaren', 'Bentley', 'Fiat', 'Peugeot',
+    'Citroen', 'Renault', 'Opel', 'Skoda', 'Seat', 'Lada',
+    'АвтоВАЗ', 'ГАЗ', 'УАЗ', 'КАМАЗ', 'BYD', 'Geely', 'Nio', 'Xpeng'
 ]
 
 
@@ -245,24 +229,33 @@ def get_companies():
             if 'company' in data and data['company']:
                 companies.add(data['company'])
 
-            # Ищем по ключевым словам
-            for kw in CAR_KEYWORDS:
-                if kw.lower() in text.lower():
-                    companies.add(kw)
+            # Сначала ищем компании из двух слов
+            for mw in MULTI_WORD_COMPANIES:
+                if mw.lower() in text.lower():
+                    companies.add(mw)
 
-            # Ищем слова с заглавной буквы (потенциальные названия)
-            words = re.findall(r'\b[A-Z][a-z]{3,}\b', text)
-            for word in words:
-                if len(word) > 3 and word not in ['News', 'Press', 'Auto', 'Car']:
-                    companies.add(word)
+            # Потом ищем однословные компании
+            for sw in SINGLE_WORD_COMPANIES:
+                if sw.lower() in text.lower():
+                    # Проверяем, не является ли это частью двухсловной компании
+                    is_part_of_multi = False
+                    for mw in MULTI_WORD_COMPANIES:
+                        if sw.lower() in mw.lower() and mw.lower() != sw.lower():
+                            is_part_of_multi = True
+                            break
+                    if not is_part_of_multi:
+                        companies.add(sw)
 
         except:
             pass
 
     conn.close()
 
-    # Фильтруем и сортируем
-    result = sorted([c for c in companies if len(c) > 2])
+    # Сортируем: сначала двухсловные, потом однословные
+    multi = [c for c in companies if ' ' in c]
+    single = [c for c in companies if ' ' not in c]
+    result = sorted(multi) + sorted(single)
+
     return jsonify(result)
 
 
