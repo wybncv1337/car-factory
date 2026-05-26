@@ -20,7 +20,6 @@ app = Flask(__name__,
             static_folder=str(STATIC_DIR))
 CORS(app)
 
-# Просто используем SQLite, без PostgreSQL
 DB_PATH = 'car_factory.db'
 
 
@@ -90,7 +89,6 @@ def get_metrics():
         cur.execute("SELECT COUNT(*) FROM alerts WHERE is_active = 1")
         total_alerts = cur.fetchone()[0] or 0
 
-        # Динамика по дням
         cur.execute('''
                     SELECT DATE (created_at) as date, COUNT (*) as count
                     FROM facts
@@ -113,7 +111,6 @@ def get_metrics():
         daily_stats = []
 
     conn.close()
-
     return jsonify({
         'total_docs': total_docs,
         'total_vacancies': total_vacancies,
@@ -173,7 +170,6 @@ def get_facts():
             'created_at': row['created_at']
         })
 
-    # Общее количество
     count_query = "SELECT COUNT(*) FROM facts"
     if conditions:
         count_query += " WHERE " + " AND ".join(conditions)
@@ -183,7 +179,6 @@ def get_facts():
     total = cur.fetchone()[0] or 0
 
     conn.close()
-
     return jsonify({
         'facts': facts,
         'total': total,
@@ -193,36 +188,50 @@ def get_facts():
     })
 
 
-# ==================== API: КОМПАНИИ ====================
+# ==================== API: КОМПАНИИ (ИСПРАВЛЕНО) ====================
+
+# Список известных автопроизводителей
+CAR_COMPANIES = [
+    'Tesla', 'BMW', 'Toyota', 'Mercedes', 'Audi', 'Volkswagen',
+    'Lada', 'АвтоВАЗ', 'Kia', 'Hyundai', 'Nissan', 'Ford',
+    'Honda', 'Porsche', 'Ferrari', 'Lamborghini', 'Maserati',
+    'Jaguar', 'Land Rover', 'Volvo', 'Subaru', 'Mazda', 'Mitsubishi',
+    'Renault', 'Peugeot', 'Citroen', 'Fiat', 'Skoda', 'Seat',
+    'Opel', 'Lexus', 'Infiniti', 'Acura', 'Alfa Romeo', 'Bentley',
+    'Rolls Royce', 'Aston Martin', 'McLaren', 'Bugatti', 'Koenigsegg'
+]
+
 
 @app.route('/api/companies')
 def get_companies():
     conn = get_db()
     cur = conn.cursor()
 
+    cur.execute("SELECT fact_data FROM facts")
+    rows = cur.fetchall()
+
     companies = set()
 
-    cur.execute("SELECT fact_data FROM facts LIMIT 200")
-
-    for row in cur.fetchall():
+    for row in rows:
         try:
             data = json.loads(row['fact_data']) if row['fact_data'] else {}
+            fact_text = str(data.get('value', '')) + ' ' + str(data)
 
+            # Ищем компании в тексте
+            for company in CAR_COMPANIES:
+                if company.lower() in fact_text.lower():
+                    companies.add(company)
+
+            # Проверяем поле company в JSON
             if 'company' in data and data['company']:
                 companies.add(data['company'])
 
-            text = str(data.get('value', ''))
-            car_companies = ['Tesla', 'BMW', 'Toyota', 'Lada', 'Mercedes', 'Audi', 'Volkswagen', 'Kia', 'Hyundai',
-                             'Nissan']
-            for company in car_companies:
-                if company.lower() in text.lower():
-                    companies.add(company)
         except:
             pass
 
     conn.close()
 
-    result = sorted(list(companies)) if companies else ['Tesla', 'BMW', 'Toyota']
+    result = sorted(list(companies))
     return jsonify(result)
 
 
@@ -263,11 +272,163 @@ def get_company_facts(company_name):
     }
 
     conn.close()
-
     return jsonify({
         'company': company_name,
         'stats': stats,
-        'facts': facts[:50]
+        'facts': facts[:100]
+    })
+
+
+# ==================== API: АЛЕРТЫ ====================
+
+@app.route('/api/alerts', methods=['GET'])
+def get_alerts():
+    conn = get_db()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("SELECT * FROM alerts ORDER BY created_at DESC")
+        alerts = []
+        for row in cur.fetchall():
+            alerts.append({
+                'id': row['id'],
+                'name': row['name'],
+                'company': row['company'],
+                'type': row['alert_type'],
+                'keywords': row['keywords'].split(',') if row['keywords'] else [],
+                'language': row['language'] or 'any',
+                'is_active': bool(row['is_active']),
+                'created_at': row['created_at']
+            })
+    except:
+        alerts = []
+
+    conn.close()
+    return jsonify(alerts)
+
+
+@app.route('/api/alerts', methods=['POST'])
+def create_alert():
+    data = request.json
+    conn = get_db()
+    cur = conn.cursor()
+
+    keywords = ','.join(data.get('keywords', [])) if isinstance(data.get('keywords'), list) else data.get('keywords',
+                                                                                                          '')
+
+    cur.execute('''
+                INSERT INTO alerts (name, company, alert_type, keywords, language, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ''', (data.get('name'), data.get('company'), data.get('type'), keywords, data.get('language', 'any'),
+                      datetime.now()))
+
+    conn.commit()
+    alert_id = cur.lastrowid
+    conn.close()
+    return jsonify({'id': alert_id, 'message': 'Alert created'})
+
+
+@app.route('/api/alerts/<int:alert_id>', methods=['DELETE'])
+def delete_alert(alert_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM alerts WHERE id = ?", (alert_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Alert deleted'})
+
+
+# ==================== API: СВОДКА ====================
+
+@app.route('/api/weekly-summary')
+def get_weekly_summary():
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=7)
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute('''
+                SELECT DATE (created_at) as date, COUNT (*) as count
+                FROM facts
+                WHERE created_at >= ?
+                GROUP BY DATE (created_at)
+                ORDER BY date
+                ''', (start_date,))
+
+    news_by_day = [{'date': row['date'], 'count': row['count']} for row in cur.fetchall()]
+
+    cur.execute("SELECT COUNT(*) FROM facts WHERE created_at >= ?", (start_date,))
+    total_new = cur.fetchone()[0] or 0
+
+    conn.close()
+
+    return jsonify({
+        'period': {'start': start_date.strftime('%Y-%m-%d'), 'end': end_date.strftime('%Y-%m-%d')},
+        'news_by_day': news_by_day,
+        'new_vacancies': total_new // 3,
+        'new_releases': total_new // 3,
+        'new_prices': total_new // 3,
+        'alert_triggers': 0,
+        'top_companies': []
+    })
+
+
+# ==================== API: ЭКСПОРТ ====================
+
+@app.route('/api/facts/export/csv')
+def export_facts_csv():
+    company = request.args.get('company')
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    if company:
+        cur.execute("SELECT * FROM facts WHERE fact_data LIKE ?", (f'%{company}%',))
+    else:
+        cur.execute("SELECT * FROM facts LIMIT 1000")
+
+    rows = cur.fetchall()
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['id', 'type', 'fact_data', 'confidence', 'created_at'])
+
+    for row in rows:
+        writer.writerow([row['id'], row['type'], row['fact_data'], row['confidence'], row['created_at']])
+
+    conn.close()
+
+    output.seek(0)
+    return send_file(
+        BytesIO(output.getvalue().encode('utf-8-sig')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=f'facts_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+    )
+
+
+# ==================== API: QA ТЕСТЫ ====================
+
+@app.route('/api/qa/test-bad-sources')
+def test_bad_sources():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, fact_data FROM facts WHERE fact_data IS NULL OR LENGTH(fact_data) < 50 LIMIT 15")
+
+    bad_sources = []
+    for row in cur.fetchall():
+        bad_sources.append({
+            'id': row['id'],
+            'url': 'fact_' + str(row['id']),
+            'content_length': len(row['fact_data']) if row['fact_data'] else 0
+        })
+
+    conn.close()
+    return jsonify({
+        'bad_sources_count': len(bad_sources),
+        'bad_sources': bad_sources,
+        'message': f'Found {len(bad_sources)} potentially bad sources'
     })
 
 
