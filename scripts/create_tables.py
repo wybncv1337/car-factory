@@ -7,14 +7,12 @@ def create_tables():
     conn = sqlite3.connect('car_factory.db')
     cursor = conn.cursor()
 
-    # Удаляем старые таблицы (если есть)
     cursor.execute("DROP TABLE IF EXISTS raw_docs")
     cursor.execute("DROP TABLE IF EXISTS clean_docs")
     cursor.execute("DROP TABLE IF EXISTS facts")
     cursor.execute("DROP TABLE IF EXISTS alerts")
     cursor.execute("DROP TABLE IF EXISTS alert_triggers")
 
-    # Создаем таблицу raw_docs
     cursor.execute('''
                    CREATE TABLE raw_docs
                    (
@@ -25,7 +23,6 @@ def create_tables():
                    )
                    ''')
 
-    # Создаем таблицу clean_docs
     cursor.execute('''
                    CREATE TABLE clean_docs
                    (
@@ -36,7 +33,6 @@ def create_tables():
                    )
                    ''')
 
-    # Создаем таблицу facts
     cursor.execute('''
                    CREATE TABLE facts
                    (
@@ -49,7 +45,6 @@ def create_tables():
                    )
                    ''')
 
-    # Создаем таблицу alerts
     cursor.execute('''
                    CREATE TABLE alerts
                    (
@@ -67,7 +62,6 @@ def create_tables():
                    )
                    ''')
 
-    # Создаем таблицу alert_triggers
     cursor.execute('''
                    CREATE TABLE alert_triggers
                    (

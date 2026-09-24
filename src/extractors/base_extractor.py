@@ -14,7 +14,7 @@ class BaseExtractor(ABC):
             name: имя экстрактора (по умолчанию "base")
         """
         self.name = name
-        self.patterns = []  # Должен быть списком словарей
+        self.patterns = []
 
     @abstractmethod
     def extract(self, text, source=""):
@@ -26,7 +26,6 @@ class BaseExtractor(ABC):
         compiled = []
         for pattern in self.patterns:
             if isinstance(pattern, dict):
-                # Если словарь - компилируем regex из ключа 'pattern'
                 if 'pattern' in pattern:
                     try:
                         compiled.append({
@@ -40,7 +39,6 @@ class BaseExtractor(ABC):
                     except re.error as e:
                         print(f"Ошибка компиляции regex {pattern['pattern']}: {e}")
             elif isinstance(pattern, (tuple, list)) and len(pattern) >= 2:
-                # Для обратной совместимости с кортежами
                 try:
                     regex_str = pattern[0] if isinstance(pattern[0], str) else str(pattern[0])
                     compiled.append({
@@ -68,13 +66,12 @@ class BaseExtractor(ABC):
                 confidence = pattern_info['confidence']
 
                 for match in regex.finditer(text):
-                    # Берем первую группу или всю строку
                     if match.groups():
                         value = match.group(1).strip()
                     else:
                         value = match.group(0).strip()
 
-                    if value:  # Проверяем, что значение не пустое
+                    if value:
                         fact = {
                             'type': fact_type,
                             'subtype': subtype,
@@ -85,7 +82,6 @@ class BaseExtractor(ABC):
                             'position': match.start()
                         }
 
-                        # Добавляем валюту если есть
                         if pattern_info.get('currency'):
                             fact['currency'] = pattern_info['currency']
 

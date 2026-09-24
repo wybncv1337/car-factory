@@ -14,7 +14,6 @@ import openai
 from src.config import Config
 from src.database.db_manager import DatabaseManager
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -29,26 +28,15 @@ class LLMExtractor:
     """
 
     def __init__(self, api_key: str = None, base_url: str = None, cache_dir: str = None):
-        # Настройки по умолчанию (Ollama)
         self.base_url = base_url or getattr(Config, 'OLLAMA_BASE_URL', 'http://localhost:11434/v1')
         self.model = getattr(Config, 'OLLAMA_MODEL', 'qwen2.5:7b')
-        self.api_key = api_key or "ollama"  # Ollama не требует ключ
-
-        # Пытаемся использовать DeepSeek если настроен
-        deepseek_key = os.getenv('DEEPSEEK_API_KEY') or getattr(Config, 'DEEPSEEK_API_KEY', '')
-        if deepseek_key and deepseek_key not in ['', 'your-api-key-here', 'sk-placeholder']:
-            self.api_key = deepseek_key
-            self.base_url = "https://api.deepseek.com/v1"
-            self.model = "deepseek-chat"
-            logger.info("✅ Используется DeepSeek API")
+        self.api_key = api_key or "ollama"
 
         self.cache_dir = Path(cache_dir or Config.CACHE_DIR)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Подключение к БД
         self.db = DatabaseManager(Config.DB_PATH)
 
-        # Статистика
         self.stats = {
             'total_processed': 0,
             'cache_hits': 0,
@@ -56,17 +44,14 @@ class LLMExtractor:
             'errors': 0
         }
 
-        # Инициализация клиента
         self.client = None
         self.mock_mode = False
 
-        # Пытаемся инициализировать клиент
         try:
             self.client = openai.OpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url
             )
-            # Проверяем соединение (только для Ollama)
             if "localhost" in self.base_url or "127.0.0.1" in self.base_url:
                 try:
                     self.client.models.list()
@@ -82,7 +67,6 @@ class LLMExtractor:
             logger.warning(f"Не удалось инициализировать клиент: {e}")
             self.mock_mode = True
 
-        # Если ничего не работает - мок-режим
         if self.mock_mode:
             logger.warning("⚠️ Работаем в мок-режиме (без реальных LLM запросов)")
 
@@ -176,7 +160,6 @@ class LLMExtractor:
             }
         }
 
-        # Поиск вакансий в тексте
         vacancy_keywords = ['ваканс', 'hire', 'job', 'salary', 'зарплат', 'требуется', 'ищем', 'вакансия']
         if any(kw in text.lower() for kw in vacancy_keywords):
             result["vacancies"].append({
@@ -187,7 +170,6 @@ class LLMExtractor:
                 "location": "Москва" if is_russian else "Remote"
             })
 
-        # Поиск цен
         price_keywords = ['цена', 'price', 'стоимост', 'руб', '$', '€', '₽']
         if any(kw in text.lower() for kw in price_keywords):
             result["prices"].append({
@@ -197,7 +179,6 @@ class LLMExtractor:
                 "condition": "new"
             })
 
-        # Поиск релизов
         release_keywords = ['выпуст', 'release', 'новая модель', 'new model', 'релиз', 'представит']
         if any(kw in text.lower() for kw in release_keywords):
             result["releases"].append({
@@ -233,7 +214,6 @@ class LLMExtractor:
 
             content = response.choices[0].message.content
 
-            # Извлекаем JSON из ответа
             json_start = content.find('{')
             json_end = content.rfind('}') + 1
             if json_start >= 0 and json_end > json_start:
@@ -269,7 +249,6 @@ class LLMExtractor:
             logger.debug(f"Text too short ({len(text)} chars), skipping LLM")
             return {"skipped": "text_too_short", "length": len(text)}
 
-        # Проверяем кэш
         cache_key = self._get_cache_key(text)
         if not force_refresh and Config.CACHE_ENABLED:
             cached = self._get_cached_response(cache_key)
@@ -278,7 +257,6 @@ class LLMExtractor:
                 logger.info(f"Cache hit for {source}")
                 return cached
 
-        # Если в мок-режиме, используем мок
         if self.mock_mode:
             logger.info(f"Mock mode for {source}")
             result = self._extract_mock(text, source)
@@ -286,7 +264,6 @@ class LLMExtractor:
                 self._save_to_cache(cache_key, result)
             return result
 
-        # Вызываем LLM
         logger.info(f"Calling LLM ({self.model}) for {source}...")
         self.stats['api_calls'] += 1
 
@@ -294,7 +271,6 @@ class LLMExtractor:
             prompt = self._prepare_prompt(text)
             result = self._call_llm(prompt)
 
-            # Добавляем метаданные
             result['_metadata'] = {
                 'source': source,
                 'extracted_at': datetime.now().isoformat(),
@@ -302,11 +278,9 @@ class LLMExtractor:
                 'text_length': len(text)
             }
 
-            # Сохраняем в кэш
             if Config.CACHE_ENABLED:
                 self._save_to_cache(cache_key, result)
 
-            # Сохраняем факты в БД
             self._save_facts_to_db(result, source)
 
             return result
@@ -314,7 +288,6 @@ class LLMExtractor:
         except Exception as e:
             self.stats['errors'] += 1
             logger.error(f"LLM extraction failed for {source}: {e}")
-            # В случае ошибки используем мок
             return self._extract_mock(text, source)
 
     def _save_facts_to_db(self, facts: Dict, source: str):
@@ -323,21 +296,18 @@ class LLMExtractor:
             conn = self.db.get_connection()
             cursor = conn.cursor()
 
-            # Сохраняем вакансии
             for vacancy in facts.get('vacancies', []):
                 cursor.execute('''
                                INSERT INTO facts (clean_doc_id, type, fact_data, confidence, created_at)
                                VALUES (?, ?, ?, ?, ?)
                                ''', (None, 'vacancy', json.dumps(vacancy, ensure_ascii=False), 0.95, datetime.now()))
 
-            # Сохраняем цены
             for price in facts.get('prices', []):
                 cursor.execute('''
                                INSERT INTO facts (clean_doc_id, type, fact_data, confidence, created_at)
                                VALUES (?, ?, ?, ?, ?)
                                ''', (None, 'price', json.dumps(price, ensure_ascii=False), 0.95, datetime.now()))
 
-            # Сохраняем релизы
             for release in facts.get('releases', []):
                 cursor.execute('''
                                INSERT INTO facts (clean_doc_id, type, fact_data, confidence, created_at)
@@ -386,7 +356,6 @@ class LLMExtractor:
                         logger.error(f"Error processing {item.get('source')}: {e}")
                         results.append({"error": str(e), "source": item.get('source')})
 
-                # Дополнительная задержка между батчами
                 if i + batch_size < total and not self.mock_mode and "localhost" not in self.base_url:
                     logger.info(f"Waiting 3 seconds before next batch...")
                     time.sleep(3)
@@ -408,5 +377,4 @@ class LLMExtractor:
         }
 
 
-# Создаем глобальный экземпляр
 llm_extractor = LLMExtractor()

@@ -9,7 +9,6 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from src.database.db_manager import DatabaseManager
 
-# Добавляем импорт нормализатора
 from src.utils.text_normalizer import normalizer
 
 from src.extractors.llm_extractor import llm_extractor
@@ -19,11 +18,9 @@ def extract_with_llm(self, text, source="", force_refresh=False):
     """
     Извлекает факты с помощью LLM (только для важных текстов)
     """
-    # Проверяем важность текста
     if len(text) < 500:
         return {"skipped": "text_too_short"}
 
-    # Используем LLM экстрактор
     result = llm_extractor.extract(text, source, force_refresh)
 
     # Сохраняем результаты в БД
@@ -72,7 +69,6 @@ class RuleEngine:
     def extract_from_text(self, text, filename="unknown", clean_doc_id=None):
         all_facts = []
 
-        # Получаем нормализованные данные из текста
         normalized_data = normalizer.process_text(text)
 
         for extractor_name, extractor in self.extractors.items():
@@ -114,7 +110,6 @@ class RuleEngine:
         print(f"\n📂 Обрабатывается папка: {folder}")
         print(f"📄 Найдено файлов: {len(txt_files)}")
 
-        # Статистика по языкам
         language_stats = {'ru': 0, 'en': 0, 'unknown': 0}
 
         for filepath in txt_files:
@@ -122,15 +117,12 @@ class RuleEngine:
             facts = self.extract_from_file(filepath)
             results[filepath.name] = facts
 
-            # Собираем статистику по языкам
             if facts:
-                # Берем язык из первого факта (они все одинаковые для одного файла)
                 lang = facts[0].get('language', 'unknown')
                 language_stats[lang] = language_stats.get(lang, 0) + 1
 
             print(f" найдено {len(facts)} фактов")
 
-        # Выводим статистику по языкам
         print(f"\n📊 Статистика по языкам:")
         for lang, count in language_stats.items():
             if count > 0:
@@ -162,14 +154,12 @@ class RuleEngine:
             facts = self.extract_from_text(content, f"doc_{doc_id}", doc_id)
             results.extend(facts)
 
-            # Собираем статистику по языкам
             if facts:
                 lang = facts[0].get('language', 'unknown')
                 language_stats[lang] = language_stats.get(lang, 0) + 1
 
             print(f"  📄 Документ {doc_id}: найдено {len(facts)} фактов")
 
-        # Выводим статистику по языкам
         print(f"\n📊 Статистика по языкам в документах:")
         for lang, count in language_stats.items():
             if count > 0:
@@ -286,12 +276,9 @@ class RuleEngine:
         }
 
 
-# Пример использования
 if __name__ == '__main__':
-    # Быстрый тест
     engine = RuleEngine()
 
-    # Тестовый текст
     test_text = """
     Компания выпустит новую модель 15 мая 2024 года. 
     Цена составит 2.5 млн руб. 

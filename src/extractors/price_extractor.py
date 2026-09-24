@@ -79,24 +79,20 @@ class PriceExtractor(BaseExtractor):
             try:
                 regex = re.compile(pattern_info['pattern'], re.IGNORECASE | re.UNICODE)
                 for match in regex.finditer(text):
-                    # Получаем значение
                     if match.groups():
                         value = match.group(1).strip()
                     else:
                         value = match.group(0).strip()
 
                     if value:
-                        # Очищаем значение от пробелов и запятых
                         clean_value = re.sub(r'[,\s]', '', value)
 
-                        # Пытаемся конвертировать в число
                         try:
                             if '.' in clean_value:
                                 amount = float(clean_value)
                             else:
                                 amount = int(clean_value)
 
-                            # Проверяем множители в тексте
                             text_before = text[max(0, match.start() - 20):match.start()]
                             text_after = text[match.end():match.end() + 20]
                             context = (text_before + text_after).lower()
@@ -120,7 +116,6 @@ class PriceExtractor(BaseExtractor):
                             facts.append(fact)
 
                         except ValueError:
-                            # Если не удалось конвертировать в число, сохраняем как строку
                             fact = {
                                 'type': pattern_info['type'],
                                 'subtype': pattern_info.get('subtype', 'price'),

@@ -10,7 +10,6 @@ class ReleaseExtractor(BaseExtractor):
     def __init__(self):
         super().__init__(name="release")
         self.patterns = [
-            # Русские релизы
             {
                 'pattern': r'(?:выпустит|представит|запустит|релиз|анонсирует|презентует)\s+([А-Яа-я0-9\s]+)',
                 'type': 'release',

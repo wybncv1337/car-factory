@@ -62,11 +62,6 @@ def weekly_summary_page():
     return render_template('weekly_summary.html')
 
 
-@app.route('/qa-tests')
-def qa_tests_page():
-    return render_template('qa_tests.html')
-
-
 # ==================== API: МЕТРИКИ ====================
 
 @app.route('/api/metrics')
@@ -95,8 +90,7 @@ def get_metrics():
                     FROM facts
                     WHERE created_at IS NOT NULL
                     GROUP BY DATE (created_at)
-                    ORDER BY date DESC
-                        LIMIT 30
+                    ORDER BY date
                     ''')
         daily_stats = []
         for row in cur.fetchall():
@@ -163,12 +157,20 @@ def get_facts():
             except:
                 fact_data = {'value': row['fact_data'][:200]}
 
+        # Безопасное получение source_url
+        source_url = None
+        try:
+            source_url = row['source_url']
+        except:
+            pass
+
         facts.append({
             'id': row['id'],
             'type': row['type'],
             'data': fact_data,
             'confidence': row['confidence'] or 0.5,
-            'created_at': row['created_at']
+            'created_at': row['created_at'],
+            'source_url': source_url
         })
 
     count_query = "SELECT COUNT(*) FROM facts"
@@ -189,16 +191,14 @@ def get_facts():
     })
 
 
-# ==================== API: КОМПАНИИ (ИСПРАВЛЕНО) ====================
+# ==================== API: КОМПАНИИ ====================
 
-# Компании из двух слов (целиком)
 MULTI_WORD_COMPANIES = [
     'Aston Martin', 'Alfa Romeo', 'Land Rover', 'Rolls Royce',
     'General Motors', 'Great Wall', 'Li Auto', 'Lynk Co',
     'Mercedes-Benz', 'Morgan Motor'
 ]
 
-# Однословные компании (исключая те, что являются частями двухсловных)
 SINGLE_WORD_COMPANIES = [
     'Tesla', 'BMW', 'Mercedes', 'Audi', 'Volkswagen', 'Porsche',
     'Toyota', 'Honda', 'Nissan', 'Hyundai', 'Kia', 'Ford',
@@ -225,19 +225,15 @@ def get_companies():
             data = json.loads(row['fact_data']) if row['fact_data'] else {}
             text = str(data.get('value', '')) + ' ' + str(data)
 
-            # Проверяем поле company в JSON
             if 'company' in data and data['company']:
                 companies.add(data['company'])
 
-            # Сначала ищем компании из двух слов
             for mw in MULTI_WORD_COMPANIES:
                 if mw.lower() in text.lower():
                     companies.add(mw)
 
-            # Потом ищем однословные компании
             for sw in SINGLE_WORD_COMPANIES:
                 if sw.lower() in text.lower():
-                    # Проверяем, не является ли это частью двухсловной компании
                     is_part_of_multi = False
                     for mw in MULTI_WORD_COMPANIES:
                         if sw.lower() in mw.lower() and mw.lower() != sw.lower():
@@ -251,7 +247,6 @@ def get_companies():
 
     conn.close()
 
-    # Сортируем: сначала двухсловные, потом однословные
     multi = [c for c in companies if ' ' in c]
     single = [c for c in companies if ' ' not in c]
     result = sorted(multi) + sorted(single)
@@ -280,12 +275,19 @@ def get_company_facts(company_name):
             except:
                 fact_data = {'value': row['fact_data'][:200]}
 
+        source_url = None
+        try:
+            source_url = row['source_url']
+        except:
+            pass
+
         facts.append({
             'id': row['id'],
             'type': row['type'],
             'data': fact_data,
             'confidence': row['confidence'] or 0.5,
-            'created_at': row['created_at']
+            'created_at': row['created_at'],
+            'source_url': source_url
         })
 
     stats = {
@@ -416,10 +418,15 @@ def export_facts_csv():
 
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(['id', 'type', 'fact_data', 'confidence', 'created_at'])
+    writer.writerow(['id', 'type', 'fact_data', 'confidence', 'created_at', 'source_url'])
 
     for row in rows:
-        writer.writerow([row['id'], row['type'], row['fact_data'], row['confidence'], row['created_at']])
+        source_url = ''
+        try:
+            source_url = row['source_url'] or ''
+        except:
+            pass
+        writer.writerow([row['id'], row['type'], row['fact_data'], row['confidence'], row['created_at'], source_url])
 
     conn.close()
 
@@ -432,29 +439,7 @@ def export_facts_csv():
     )
 
 
-# ==================== API: QA ТЕСТЫ ====================
-
-@app.route('/api/qa/test-bad-sources')
-def test_bad_sources():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT id, fact_data FROM facts WHERE fact_data IS NULL OR LENGTH(fact_data) < 50 LIMIT 15")
-
-    bad_sources = []
-    for row in cur.fetchall():
-        bad_sources.append({
-            'id': row['id'],
-            'url': 'fact_' + str(row['id']),
-            'content_length': len(row['fact_data']) if row['fact_data'] else 0
-        })
-
-    conn.close()
-    return jsonify({
-        'bad_sources_count': len(bad_sources),
-        'bad_sources': bad_sources,
-        'message': f'Found {len(bad_sources)} potentially bad sources'
-    })
-
+# ==================== ЗАПУСК ====================
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

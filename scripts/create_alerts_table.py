@@ -5,7 +5,6 @@ def create_alerts_table():
     conn = sqlite3.connect('car_factory.db')
     cursor = conn.cursor()
 
-    # Таблица для алертов
     cursor.execute('''
                    CREATE TABLE IF NOT EXISTS alerts
                    (
@@ -47,7 +46,6 @@ def create_alerts_table():
                    )
                    ''')
 
-    # Таблица для истории срабатываний
     cursor.execute('''
                    CREATE TABLE IF NOT EXISTS alert_triggers
                    (
@@ -79,7 +77,6 @@ def create_alerts_table():
                        )
                    ''')
 
-    # Таблица для пользователей (простая)
     cursor.execute('''
                    CREATE TABLE IF NOT EXISTS users
                    (

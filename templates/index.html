@@ -70,7 +70,7 @@
 
     <!-- Daily Chart -->
     <div class="filter-card mt-4">
-        <h5><i class="fas fa-chart-line"></i> Динамика фактов (последние 30 дней)</h5>
+        <h5><i class="fas fa-chart-line"></i> Динамика фактов</h5>
         <div id="dailyChart" style="height: 400px;"></div>
     </div>
 
@@ -83,26 +83,17 @@
 
 <script>
 async function loadDashboard() {
-    console.log("Загрузка данных...");
-
     try {
-        // Загружаем метрики
         const metricsRes = await fetch('/api/metrics');
         const metrics = await metricsRes.json();
-        console.log("Метрики получены:", metrics);
 
-        // Обновляем карточки
         document.getElementById('totalDocs').textContent = metrics.total_docs || 0;
         document.getElementById('totalVacancies').textContent = metrics.total_vacancies || 0;
         document.getElementById('totalReleases').textContent = metrics.total_releases || 0;
         document.getElementById('totalPrices').textContent = metrics.total_prices || 0;
 
-        // Рисуем график
         if (metrics.daily_stats && metrics.daily_stats.length > 0) {
-            const dates = metrics.daily_stats.map(d => {
-                const date = new Date(d.date);
-                return date.toLocaleDateString('ru-RU');
-            });
+            const dates = metrics.daily_stats.map(d => d.date);
             const counts = metrics.daily_stats.map(d => d.count);
 
             const trace = {
@@ -116,7 +107,6 @@ async function loadDashboard() {
             };
 
             const layout = {
-                title: '',
                 xaxis: { title: 'Дата', tickangle: -45 },
                 yaxis: { title: 'Количество' },
                 plot_bgcolor: 'white',
@@ -130,33 +120,30 @@ async function loadDashboard() {
         }
 
     } catch (error) {
-        console.error("Ошибка загрузки метрик:", error);
-        document.getElementById('stats').innerHTML = '<div class="alert alert-danger">Ошибка загрузки метрик</div>';
+        console.error("Error:", error);
     }
 
     try {
-        // Загружаем последние факты
         const factsRes = await fetch('/api/facts?limit=10');
         const factsData = await factsRes.json();
-        console.log("Факты получены:", factsData.facts?.length || 0);
 
         const container = document.getElementById('factsList');
         container.innerHTML = '';
 
         if (factsData.facts && factsData.facts.length > 0) {
             factsData.facts.forEach(fact => {
-                let value = '';
-                if (fact.data && fact.data.value) {
-                    value = fact.data.value;
-                } else if (fact.data) {
-                    value = JSON.stringify(fact.data);
-                } else {
-                    value = 'Нет данных';
-                }
-
+                let value = fact.data?.value || 'Нет данных';
                 const typeIcon = fact.type === 'vacancy' ? 'fa-user-tie' : (fact.type === 'release' ? 'fa-car' : 'fa-tag');
                 const typeColor = fact.type === 'vacancy' ? 'success' : (fact.type === 'release' ? 'danger' : 'warning');
                 const date = fact.created_at ? new Date(fact.created_at).toLocaleDateString('ru-RU') : '';
+
+                // Ссылка на источник
+                let sourceLink = '';
+                if (fact.source_url) {
+                    sourceLink = `<a href="${fact.source_url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
+                                    <i class="fas fa-external-link-alt"></i> Перейти к источнику
+                                  </a>`;
+                }
 
                 const card = document.createElement('div');
                 card.className = 'fact-card';
@@ -173,6 +160,7 @@ async function loadDashboard() {
                     <div class="mt-2">
                         <strong>${escapeHtml(value.substring(0, 200))}</strong>
                     </div>
+                    ${sourceLink}
                 `;
                 container.appendChild(card);
             });
@@ -181,8 +169,7 @@ async function loadDashboard() {
         }
 
     } catch (error) {
-        console.error("Ошибка загрузки фактов:", error);
-        document.getElementById('factsList').innerHTML = '<div class="alert alert-danger">Ошибка загрузки фактов</div>';
+        console.error("Error:", error);
     }
 }
 
@@ -192,9 +179,7 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Загружаем при загрузке страницы
 document.addEventListener('DOMContentLoaded', loadDashboard);
-// Обновляем каждые 5 минут
 setInterval(loadDashboard, 300000);
 </script>
 {% endblock %}

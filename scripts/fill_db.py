@@ -10,9 +10,7 @@ def fill_database():
     conn = sqlite3.connect('car_factory.db')
     cursor = conn.cursor()
 
-    # Тестовые данные
     test_data = [
-        # Вакансии
         ('vacancy',
          '{"value": "Открыта вакансия инженера в Tesla", "position": "Engineer", "salary": 150000, "company": "Tesla"}'),
         ('vacancy',
@@ -28,7 +26,6 @@ def fill_database():
         ('vacancy',
          '{"value": "Toyota открывает вакансию механика", "position": "Mechanic", "salary": 90000, "company": "Toyota"}'),
 
-        # Релизы
         ('release',
          '{"value": "Tesla выпустила новую модель Model 3", "model": "Model 3", "year": 2024, "company": "Tesla"}'),
         ('release',
@@ -60,31 +57,26 @@ def fill_database():
     now = datetime.now()
 
     for i, (fact_type, fact_data) in enumerate(test_data):
-        # Случайная дата за последние 30 дней
         days_ago = random.randint(0, 30)
         created_at = (now - timedelta(days=days_ago)).isoformat()
 
-        # raw_docs
         cursor.execute('''
                        INSERT INTO raw_docs (source_url, raw_content, created_at)
                        VALUES (?, ?, ?)
                        ''', (f"https://example.com/news_{i}.html", fact_data, created_at))
         raw_id = cursor.lastrowid
 
-        # clean_docs
         cursor.execute('''
                        INSERT INTO clean_docs (raw_doc_id, clean_content, created_at)
                        VALUES (?, ?, ?)
                        ''', (raw_id, fact_data, created_at))
         clean_id = cursor.lastrowid
 
-        # facts
         cursor.execute('''
                        INSERT INTO facts (clean_doc_id, type, fact_data, confidence, created_at)
                        VALUES (?, ?, ?, ?, ?)
                        ''', (clean_id, fact_type, fact_data, 0.95, created_at))
 
-    # Добавляем алерты
     alerts = [
         ('Tesla вакансии', 'Tesla', 'vacancy', 'engineer,hiring', 'en', 1),
         ('BMW новинки', 'BMW', 'release', 'new,launch,unveils', 'en', 1),
@@ -99,7 +91,6 @@ def fill_database():
                        VALUES (?, ?, ?, ?, ?, ?, ?)
                        ''', (name, company, alert_type, keywords, language, is_active, now.isoformat()))
 
-    # Добавляем несколько срабатываний алертов
     cursor.execute("SELECT id FROM alerts")
     alert_ids = [row[0] for row in cursor.fetchall()]
 

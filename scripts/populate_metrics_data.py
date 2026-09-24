@@ -16,7 +16,6 @@ def populate_metrics_data():
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Проверяем, есть ли уже данные
     cursor.execute("SELECT COUNT(*) FROM raw_docs")
     count = cursor.fetchone()[0]
 

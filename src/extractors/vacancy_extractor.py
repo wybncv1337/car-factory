@@ -10,7 +10,6 @@ class VacancyExtractor(BaseExtractor):
     def __init__(self):
         super().__init__(name="vacancy")  # 👈 Передаем имя
         self.patterns = [
-            # Русские вакансии
             {
                 'pattern': r'(?:вакансия|требуется|ищем|открыта вакансия|в поиске)\s+([А-Яа-я\s]+)',
                 'type': 'vacancy',
@@ -35,7 +34,6 @@ class VacancyExtractor(BaseExtractor):
                 'subtype': 'schedule',
                 'confidence': 0.8
             },
-            # Английские вакансии
             {
                 'pattern': r'(?:vacancy|job|position|hiring|we are looking for)\s+([A-Za-z\s]+)',
                 'type': 'vacancy',

@@ -35,13 +35,11 @@ class MetricsCalculator:
         conn = self.get_connection()
         cursor = conn.cursor()
 
-        # Проверяем, есть ли таблица raw_docs
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='raw_docs'")
         if cursor.fetchone():
             cursor.execute('SELECT COUNT(*) as total FROM raw_docs')
             total = cursor.fetchone()[0]
 
-            # Группируем по 10 документов
             cursor.execute('''
                            SELECT (id - 1) / 10 as group_num,
                                   COUNT(*) as count
@@ -66,11 +64,9 @@ class MetricsCalculator:
         conn = self.get_connection()
         cursor = conn.cursor()
 
-        # Проверяем структуру таблицы facts
         cursor.execute("PRAGMA table_info(facts)")
         columns = [col[1] for col in cursor.fetchall()]
 
-        # Определяем, как называются колонки
         data_column = None
         if 'fact_data' in columns:
             data_column = 'fact_data'
@@ -81,7 +77,6 @@ class MetricsCalculator:
         elif 'value' in columns:
             data_column = 'value'
 
-        # Также ищем колонку для типа
         type_column = 'type' if 'type' in columns else None
 
         if data_column:
@@ -95,7 +90,6 @@ class MetricsCalculator:
 
             cursor.execute(query)
         else:
-            # Если нет подходящих колонок, пробуем получить все
             cursor.execute("SELECT * FROM facts")
 
         rows = cursor.fetchall()
@@ -105,14 +99,12 @@ class MetricsCalculator:
 
         for row in rows:
             try:
-                # Пытаемся получить данные из разных возможных форматов
                 text = ""
                 if data_column:
                     data = row[0]
                 else:
                     data = row[0] if len(row) > 0 else ""
 
-                # Если данные в JSON
                 if isinstance(data, str) and data.startswith('{'):
                     try:
                         data_dict = json.loads(data)
@@ -124,7 +116,6 @@ class MetricsCalculator:
 
                 vacancies.append(text)
 
-                # Извлекаем зарплату
                 salary_match = re.search(r'(\d{5,6})', text)
                 if salary_match:
                     salaries.append(int(salary_match.group(1)))
@@ -132,7 +123,6 @@ class MetricsCalculator:
             except Exception as e:
                 continue
 
-        # Группировка по блокам
         monthly = defaultdict(int)
         for i, v in enumerate(vacancies):
             group = i // 10
@@ -152,7 +142,6 @@ class MetricsCalculator:
         conn = self.get_connection()
         cursor = conn.cursor()
 
-        # Проверяем структуру таблицы facts
         cursor.execute("PRAGMA table_info(facts)")
         columns = [col[1] for col in cursor.fetchall()]
 
@@ -206,7 +195,6 @@ class MetricsCalculator:
 
                 releases.append(text.lower())
 
-                # Ищем модели
                 text_lower = text.lower()
                 for model in model_keywords:
                     if model in text_lower:
@@ -215,7 +203,6 @@ class MetricsCalculator:
             except Exception as e:
                 continue
 
-        # Группировка по блокам
         monthly = defaultdict(int)
         for i, r in enumerate(releases):
             group = i // 10

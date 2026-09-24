@@ -5,7 +5,6 @@ def check_facts():
     conn = sqlite3.connect('car_factory.db')
     cursor = conn.cursor()
 
-    # Проверяем структуру таблицы
     cursor.execute("PRAGMA table_info(facts)")
     columns = cursor.fetchall()
 
@@ -13,7 +12,6 @@ def check_facts():
     for col in columns:
         print(f"  {col[1]} ({col[2]})")
 
-    # Проверяем есть ли данные
     cursor.execute("SELECT * FROM facts LIMIT 1")
     sample = cursor.fetchone()
     if sample:

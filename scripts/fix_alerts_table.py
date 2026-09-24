@@ -5,7 +5,6 @@ def fix_alerts_table():
     conn = sqlite3.connect('car_factory.db')
     cursor = conn.cursor()
 
-    # Проверяем текущую структуру
     cursor.execute("PRAGMA table_info(alerts)")
     columns = cursor.fetchall()
 
@@ -13,13 +12,11 @@ def fix_alerts_table():
     for col in columns:
         print(f"   - {col[1]} ({col[2]})")
 
-    # Пересоздаем таблицу с правильной структурой
     print("\n🔄 Пересоздаем таблицу alerts...")
 
     # Удаляем старую таблицу
     cursor.execute("DROP TABLE IF EXISTS alerts")
 
-    # Создаем новую с правильными колонками
     cursor.execute('''
                    CREATE TABLE alerts
                    (
@@ -37,7 +34,6 @@ def fix_alerts_table():
                    )
                    ''')
 
-    # Создаем таблицу для истории (если нет)
     cursor.execute('''
                    CREATE TABLE IF NOT EXISTS alert_triggers
                    (
