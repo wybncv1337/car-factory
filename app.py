@@ -196,6 +196,28 @@ SINGLE_WORD_COMPANIES = [
 ]
 
 
+def extract_companies_from_text(text):
+    """Извлекает компании из текста"""
+    companies = []
+    text_lower = text.lower()
+
+    for mw in MULTI_WORD_COMPANIES:
+        if mw.lower() in text_lower:
+            companies.append(mw)
+
+    for sw in SINGLE_WORD_COMPANIES:
+        if sw.lower() in text_lower:
+            is_part_of_multi = False
+            for mw in MULTI_WORD_COMPANIES:
+                if sw.lower() in mw.lower() and mw.lower() != sw.lower():
+                    is_part_of_multi = True
+                    break
+            if not is_part_of_multi:
+                companies.append(sw)
+
+    return companies
+
+
 @app.route('/api/companies')
 def get_companies():
     conn = get_db()
@@ -214,19 +236,8 @@ def get_companies():
             if 'company' in data and data['company']:
                 companies.add(data['company'])
 
-            for mw in MULTI_WORD_COMPANIES:
-                if mw.lower() in text.lower():
-                    companies.add(mw)
-
-            for sw in SINGLE_WORD_COMPANIES:
-                if sw.lower() in text.lower():
-                    is_part_of_multi = False
-                    for mw in MULTI_WORD_COMPANIES:
-                        if sw.lower() in mw.lower() and mw.lower() != sw.lower():
-                            is_part_of_multi = True
-                            break
-                    if not is_part_of_multi:
-                        companies.add(sw)
+            for c in extract_companies_from_text(text):
+                companies.add(c)
 
         except:
             pass
@@ -291,7 +302,7 @@ def get_company_facts(company_name):
     })
 
 
-# ==================== API: СВОДКА ====================
+# ==================== API: СВОДКА (С ТОП КОМПАНИЙ) ====================
 
 @app.route('/api/weekly-summary')
 def get_weekly_summary():
@@ -301,6 +312,7 @@ def get_weekly_summary():
     conn = get_db()
     cur = conn.cursor()
 
+    # Динамика по дням
     cur.execute('''
                 SELECT DATE (created_at) as date, COUNT (*) as count
                 FROM facts
@@ -311,18 +323,56 @@ def get_weekly_summary():
 
     news_by_day = [{'date': row['date'], 'count': row['count']} for row in cur.fetchall()]
 
-    cur.execute("SELECT COUNT(*) FROM facts WHERE created_at >= ?", (start_date,))
-    total_new = cur.fetchone()[0] or 0
+    # Новые факты по типам
+    cur.execute("SELECT COUNT(*) FROM facts WHERE created_at >= ? AND type = 'vacancy'", (start_date,))
+    new_vacancies = cur.fetchone()[0] or 0
+
+    cur.execute("SELECT COUNT(*) FROM facts WHERE created_at >= ? AND type = 'release'", (start_date,))
+    new_releases = cur.fetchone()[0] or 0
+
+    cur.execute("SELECT COUNT(*) FROM facts WHERE created_at >= ? AND type = 'price'", (start_date,))
+    new_prices = cur.fetchone()[0] or 0
+
+    # ТОП КОМПАНИЙ — извлекаем из текста фактов
+    cur.execute("SELECT fact_data FROM facts WHERE created_at >= ?", (start_date,))
+    rows = cur.fetchall()
+
+    company_counts = {}
+    for row in rows:
+        try:
+            data = json.loads(row['fact_data']) if row['fact_data'] else {}
+            text = str(data.get('value', '')) + ' ' + str(data)
+
+            # Ищем компании в тексте
+            found = extract_companies_from_text(text)
+
+            # Также проверяем поле company
+            if 'company' in data and data['company']:
+                found.append(data['company'])
+
+            for company in set(found):
+                company_counts[company] = company_counts.get(company, 0) + 1
+        except:
+            pass
+
+    # Сортируем топ-10
+    top_companies = [
+        {'name': name, 'count': count}
+        for name, count in sorted(company_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    ]
 
     conn.close()
 
     return jsonify({
-        'period': {'start': start_date.strftime('%Y-%m-%d'), 'end': end_date.strftime('%Y-%m-%d')},
+        'period': {
+            'start': start_date.strftime('%Y-%m-%d'),
+            'end': end_date.strftime('%Y-%m-%d')
+        },
         'news_by_day': news_by_day,
-        'new_vacancies': total_new // 3,
-        'new_releases': total_new // 3,
-        'new_prices': total_new // 3,
-        'top_companies': []
+        'new_vacancies': new_vacancies,
+        'new_releases': new_releases,
+        'new_prices': new_prices,
+        'top_companies': top_companies
     })
 
 
