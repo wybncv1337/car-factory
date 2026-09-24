@@ -2,15 +2,18 @@
 
 {% block content %}
 <div class="p-4">
-    <h2 class="mb-4"><i class="fas fa-chart-line"></i> Сводка за неделю</h2>
+    <h2 class="mb-4">Сводка за неделю</h2>
 
+    <!-- Stats Cards -->
     <div class="row mb-4" id="statsCards"></div>
 
+    <!-- Chart -->
     <div class="filter-card mb-4">
         <h5>Динамика новостей по дням</h5>
         <div id="newsChart" style="height: 300px;"></div>
     </div>
 
+    <!-- Top Companies -->
     <div class="filter-card">
         <h5>Топ компаний по упоминаниям</h5>
         <div id="topCompaniesList"></div>
@@ -18,80 +21,69 @@
 </div>
 
 <script>
-function loadWeeklySummary() {
-    $.get('/api/weekly-summary', function(data) {
+async function loadWeeklySummary() {
+    try {
+        const response = await fetch('/api/weekly-summary');
+        const data = await response.json();
+
         displayStats(data);
         displayChart(data);
         displayTopCompanies(data.top_companies);
 
-        $('#periodInfo').text(`${data.period.start} — ${data.period.end}`);
-    });
+    } catch (error) {
+        console.error("Ошибка загрузки:", error);
+    }
 }
 
 function displayStats(data) {
-    const container = $('#statsCards');
-    container.html(`
-        <div class="col-md-3">
+    const container = document.getElementById('statsCards');
+    container.innerHTML = `
+        <div class="col-md-4 mb-3">
             <div class="card card-stats">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
+                    <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h5 class="text-muted">Новые вакансии</h5>
-                            <h2 class="mb-0 text-success">+${data.new_vacancies}</h2>
+                            <h6 class="text-muted">Новые вакансии</h6>
+                            <h2 class="text-success mb-0">+${data.new_vacancies || 0}</h2>
                         </div>
-                        <div class="stat-icon bg-success bg-opacity-10">
-                            <i class="fas fa-user-tie text-success"></i>
+                        <div class="stat-icon bg-success bg-opacity-10 p-3 rounded">
+                            <i class="fas fa-user-tie text-success fa-2x"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4 mb-3">
             <div class="card card-stats">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
+                    <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h5 class="text-muted">Новые релизы</h5>
-                            <h2 class="mb-0 text-danger">+${data.new_releases}</h2>
+                            <h6 class="text-muted">Новые релизы</h6>
+                            <h2 class="text-danger mb-0">+${data.new_releases || 0}</h2>
                         </div>
-                        <div class="stat-icon bg-danger bg-opacity-10">
-                            <i class="fas fa-car text-danger"></i>
+                        <div class="stat-icon bg-danger bg-opacity-10 p-3 rounded">
+                            <i class="fas fa-car text-danger fa-2x"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4 mb-3">
             <div class="card card-stats">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
+                    <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h5 class="text-muted">Новые цены</h5>
-                            <h2 class="mb-0 text-warning">+${data.new_prices}</h2>
+                            <h6 class="text-muted">Новые цены</h6>
+                            <h2 class="text-warning mb-0">+${data.new_prices || 0}</h2>
                         </div>
-                        <div class="stat-icon bg-warning bg-opacity-10">
-                            <i class="fas fa-tag text-warning"></i>
+                        <div class="stat-icon bg-warning bg-opacity-10 p-3 rounded">
+                            <i class="fas fa-tag text-warning fa-2x"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card card-stats">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h5 class="text-muted">Срабатывания алертов</h5>
-                            <h2 class="mb-0 text-info">${data.alert_triggers}</h2>
-                        </div>
-                        <div class="stat-icon bg-info bg-opacity-10">
-                            <i class="fas fa-bell text-info"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `);
+    `;
 }
 
 function displayChart(data) {
@@ -105,26 +97,28 @@ function displayChart(data) {
         mode: 'lines+markers',
         name: 'Новости',
         line: { color: '#667eea', width: 3 },
-        marker: { size: 8, color: '#764ba2' }
+        marker: { size: 8, color: '#764ba2' },
+        fill: 'tozeroy',
+        fillcolor: 'rgba(102, 126, 234, 0.1)'
     };
 
     const layout = {
-        title: '',
-        xaxis: { title: 'Дата' },
+        xaxis: { title: 'Дата', tickangle: -45 },
         yaxis: { title: 'Количество новостей' },
         plot_bgcolor: 'white',
-        paper_bgcolor: 'white'
+        paper_bgcolor: 'white',
+        margin: { t: 10, b: 80, l: 50, r: 30 }
     };
 
-    Plotly.newPlot('newsChart', [trace], layout);
+    Plotly.newPlot('newsChart', [trace], layout, { responsive: true });
 }
 
 function displayTopCompanies(companies) {
-    const container = $('#topCompaniesList');
-    container.empty();
+    const container = document.getElementById('topCompaniesList');
+    container.innerHTML = '';
 
-    if (companies.length === 0) {
-        container.html('<p>Нет данных</p>');
+    if (!companies || companies.length === 0) {
+        container.innerHTML = '<p class="text-muted">Нет данных</p>';
         return;
     }
 
@@ -140,11 +134,9 @@ function displayTopCompanies(companies) {
         `;
     });
     html += '</div>';
-    container.html(html);
+    container.innerHTML = html;
 }
 
-$(document).ready(function() {
-    loadWeeklySummary();
-});
+document.addEventListener('DOMContentLoaded', loadWeeklySummary);
 </script>
 {% endblock %}
