@@ -1,12 +1,9 @@
 import os
 import json
 import sqlite3
-import re
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request, send_file
+from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
-import csv
-from io import BytesIO, StringIO
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
@@ -52,11 +49,6 @@ def company_page(company_name):
     return render_template('company.html', company=company_name)
 
 
-@app.route('/alerts')
-def alerts_page():
-    return render_template('alerts.html')
-
-
 @app.route('/weekly-summary')
 def weekly_summary_page():
     return render_template('weekly_summary.html')
@@ -82,9 +74,6 @@ def get_metrics():
         cur.execute("SELECT COUNT(*) FROM facts WHERE type = 'price'")
         total_prices = cur.fetchone()[0] or 0
 
-        cur.execute("SELECT COUNT(*) FROM alerts WHERE is_active = 1")
-        total_alerts = cur.fetchone()[0] or 0
-
         cur.execute('''
                     SELECT DATE (created_at) as date, COUNT (*) as count
                     FROM facts
@@ -102,7 +91,6 @@ def get_metrics():
         total_vacancies = 0
         total_releases = 0
         total_prices = 0
-        total_alerts = 0
         daily_stats = []
 
     conn.close()
@@ -111,7 +99,6 @@ def get_metrics():
         'total_vacancies': total_vacancies,
         'total_releases': total_releases,
         'total_prices': total_prices,
-        'total_alerts': total_alerts,
         'daily_stats': daily_stats
     })
 
@@ -157,7 +144,6 @@ def get_facts():
             except:
                 fact_data = {'value': row['fact_data'][:200]}
 
-        # Безопасное получение source_url
         source_url = None
         try:
             source_url = row['source_url']
@@ -305,65 +291,6 @@ def get_company_facts(company_name):
     })
 
 
-# ==================== API: АЛЕРТЫ ====================
-
-@app.route('/api/alerts', methods=['GET'])
-def get_alerts():
-    conn = get_db()
-    cur = conn.cursor()
-
-    try:
-        cur.execute("SELECT * FROM alerts ORDER BY created_at DESC")
-        alerts = []
-        for row in cur.fetchall():
-            alerts.append({
-                'id': row['id'],
-                'name': row['name'],
-                'company': row['company'],
-                'type': row['alert_type'],
-                'keywords': row['keywords'].split(',') if row['keywords'] else [],
-                'language': row['language'] or 'any',
-                'is_active': bool(row['is_active']),
-                'created_at': row['created_at']
-            })
-    except:
-        alerts = []
-
-    conn.close()
-    return jsonify(alerts)
-
-
-@app.route('/api/alerts', methods=['POST'])
-def create_alert():
-    data = request.json
-    conn = get_db()
-    cur = conn.cursor()
-
-    keywords = ','.join(data.get('keywords', [])) if isinstance(data.get('keywords'), list) else data.get('keywords',
-                                                                                                          '')
-
-    cur.execute('''
-                INSERT INTO alerts (name, company, alert_type, keywords, language, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ''', (data.get('name'), data.get('company'), data.get('type'), keywords, data.get('language', 'any'),
-                      datetime.now()))
-
-    conn.commit()
-    alert_id = cur.lastrowid
-    conn.close()
-    return jsonify({'id': alert_id, 'message': 'Alert created'})
-
-
-@app.route('/api/alerts/<int:alert_id>', methods=['DELETE'])
-def delete_alert(alert_id):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM alerts WHERE id = ?", (alert_id,))
-    conn.commit()
-    conn.close()
-    return jsonify({'message': 'Alert deleted'})
-
-
 # ==================== API: СВОДКА ====================
 
 @app.route('/api/weekly-summary')
@@ -395,48 +322,8 @@ def get_weekly_summary():
         'new_vacancies': total_new // 3,
         'new_releases': total_new // 3,
         'new_prices': total_new // 3,
-        'alert_triggers': 0,
         'top_companies': []
     })
-
-
-# ==================== API: ЭКСПОРТ ====================
-
-@app.route('/api/facts/export/csv')
-def export_facts_csv():
-    company = request.args.get('company')
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    if company:
-        cur.execute("SELECT * FROM facts WHERE fact_data LIKE ?", (f'%{company}%',))
-    else:
-        cur.execute("SELECT * FROM facts LIMIT 1000")
-
-    rows = cur.fetchall()
-
-    output = StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['id', 'type', 'fact_data', 'confidence', 'created_at', 'source_url'])
-
-    for row in rows:
-        source_url = ''
-        try:
-            source_url = row['source_url'] or ''
-        except:
-            pass
-        writer.writerow([row['id'], row['type'], row['fact_data'], row['confidence'], row['created_at'], source_url])
-
-    conn.close()
-
-    output.seek(0)
-    return send_file(
-        BytesIO(output.getvalue().encode('utf-8-sig')),
-        mimetype='text/csv',
-        as_attachment=True,
-        download_name=f'facts_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-    )
 
 
 # ==================== ЗАПУСК ====================
