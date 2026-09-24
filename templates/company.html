@@ -2,14 +2,7 @@
 
 {% block content %}
 <div class="p-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-building"></i> <span id="companyName">{{ company }}</span></h2>
-        <div>
-            <button class="btn btn-success btn-export" onclick="exportCompanyCSV()">
-                <i class="fas fa-file-csv"></i> Экспорт CSV
-            </button>
-        </div>
-    </div>
+    <h2 class="mb-4"><i class="fas fa-building"></i> <span id="companyName">{{ company }}</span></h2>
 
     <div class="row mb-4" id="statsCards"></div>
 
@@ -28,7 +21,7 @@
                 <label class="form-label">Сортировать по</label>
                 <select id="sortBy" class="form-select">
                     <option value="date">Дате</option>
-                    <option value="confidence">Уверенности</option>
+                    <option value="confidence">Достоверности</option>
                     <option value="type">Типу</option>
                 </select>
             </div>
@@ -54,129 +47,107 @@
 <script>
 const companyName = '{{ company }}';
 
-function loadCompanyFacts() {
-    const category = $('#filterCategory').val();
-    const sortBy = $('#sortBy').val();
-    const order = $('#sortOrder').val();
+async function loadCompanyFacts() {
+    const category = document.getElementById('filterCategory').value;
+    const sortBy = document.getElementById('sortBy').value;
+    const order = document.getElementById('sortOrder').value;
 
-    $.get(`/api/company/${encodeURIComponent(companyName)}?category=${category}&sort_by=${sortBy}&order=${order}`, function(data) {
+    try {
+        const response = await fetch(`/api/company/${encodeURIComponent(companyName)}?category=${category}&sort_by=${sortBy}&order=${order}`);
+        const data = await response.json();
+
         displayStats(data.stats);
         displayFacts(data.facts);
-        $('#companyName').text(data.company);
-    });
+        document.getElementById('companyName').textContent = data.company;
+
+    } catch (error) {
+        console.error(error);
+    }
 }
 
 function displayStats(stats) {
-    const container = $('#statsCards');
-    container.html(`
-        <div class="col-md-3">
+    const container = document.getElementById('statsCards');
+    container.innerHTML = `
+        <div class="col-md-3 mb-3">
             <div class="card card-stats">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h5 class="text-muted">Всего фактов</h5>
-                            <h2 class="mb-0">${stats.total}</h2>
-                        </div>
-                        <div class="stat-icon bg-primary bg-opacity-10">
-                            <i class="fas fa-database text-primary"></i>
-                        </div>
-                    </div>
+                    <h6 class="text-muted">Всего фактов</h6>
+                    <h2 class="text-primary mb-0">${stats.total}</h2>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3 mb-3">
             <div class="card card-stats">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h5 class="text-muted">Вакансии</h5>
-                            <h2 class="mb-0">${stats.vacancies}</h2>
-                        </div>
-                        <div class="stat-icon bg-success bg-opacity-10">
-                            <i class="fas fa-user-tie text-success"></i>
-                        </div>
-                    </div>
+                    <h6 class="text-muted">Вакансии</h6>
+                    <h2 class="text-success mb-0">${stats.vacancies}</h2>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3 mb-3">
             <div class="card card-stats">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h5 class="text-muted">Релизы</h5>
-                            <h2 class="mb-0">${stats.releases}</h2>
-                        </div>
-                        <div class="stat-icon bg-danger bg-opacity-10">
-                            <i class="fas fa-car text-danger"></i>
-                        </div>
-                    </div>
+                    <h6 class="text-muted">Релизы</h6>
+                    <h2 class="text-danger mb-0">${stats.releases}</h2>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3 mb-3">
             <div class="card card-stats">
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h5 class="text-muted">Цены</h5>
-                            <h2 class="mb-0">${stats.prices}</h2>
-                        </div>
-                        <div class="stat-icon bg-warning bg-opacity-10">
-                            <i class="fas fa-tag text-warning"></i>
-                        </div>
-                    </div>
+                    <h6 class="text-muted">Цены</h6>
+                    <h2 class="text-warning mb-0">${stats.prices}</h2>
                 </div>
             </div>
         </div>
-    `);
+    `;
 }
 
 function displayFacts(facts) {
-    const container = $('#factsList');
-    container.empty();
+    const container = document.getElementById('factsList');
+    container.innerHTML = '';
 
     if (facts.length === 0) {
-        container.html('<div class="alert alert-info">Факты не найдены</div>');
+        container.innerHTML = '<div class="alert alert-info">Факты не найдены</div>';
         return;
     }
 
     facts.forEach(fact => {
-        const confidenceClass = fact.confidence >= 0.9 ? 'badge-confidence-high' :
-                                fact.confidence >= 0.7 ? 'badge-confidence-medium' : 'badge-confidence-low';
-        const typeIcon = fact.type === 'vacancy' ? 'fa-user-tie' :
-                         fact.type === 'release' ? 'fa-car' : 'fa-tag';
-        const typeName = fact.type === 'vacancy' ? 'Вакансия' :
-                         fact.type === 'release' ? 'Релиз' : 'Цена';
+        const typeColor = fact.type === 'vacancy' ? 'success' : (fact.type === 'release' ? 'danger' : 'warning');
+        const typeName = fact.type === 'vacancy' ? 'Вакансия' : (fact.type === 'release' ? 'Релиз' : 'Цена');
+        const value = fact.data?.value || 'Нет данных';
+        const date = fact.created_at ? new Date(fact.created_at).toLocaleDateString('ru-RU') : '';
 
-        const value = fact.data.value || fact.data.position || fact.data.amount || '—';
+        let sourceLink = '';
+        if (fact.source_url) {
+            sourceLink = `<a href="${fact.source_url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
+                            <i class="fas fa-external-link-alt"></i> Перейти к источнику
+                          </a>`;
+        }
 
-        const card = `
-            <div class="fact-card">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <span class="badge bg-primary me-2">${typeName}</span>
-                        <span class="badge ${confidenceClass}">confidence: ${Math.round(fact.confidence * 100)}%</span>
-                    </div>
-                    <small class="text-muted">${new Date(fact.created_at).toLocaleString()}</small>
+        const card = document.createElement('div');
+        card.className = 'fact-card';
+        card.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="badge bg-${typeColor} me-2">${typeName}</span>
+                    <span class="badge bg-secondary">достоверность: ${Math.round((fact.confidence || 0.5) * 100)}%</span>
                 </div>
-                <div class="mt-2">
-                    <i class="fas ${typeIcon} me-2 text-primary"></i>
-                    <strong>${value}</strong>
-                </div>
-                ${fact.source_url ? `<small class="text-muted"><i class="fas fa-link"></i> Источник: ${fact.source_url}</small>` : ''}
+                <small class="text-muted">${date}</small>
             </div>
+            <div class="mt-2"><strong>${escapeHtml(value.substring(0, 250))}</strong></div>
+            ${sourceLink}
         `;
-        container.append(card);
+        container.appendChild(card);
     });
 }
 
-function exportCompanyCSV() {
-    window.location.href = `/api/facts/export/csv?company=${encodeURIComponent(companyName)}`;
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
-$(document).ready(function() {
-    loadCompanyFacts();
-});
+document.addEventListener('DOMContentLoaded', loadCompanyFacts);
 </script>
 {% endblock %}

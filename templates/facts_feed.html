@@ -23,10 +23,6 @@
                 <label>&nbsp;</label>
                 <button class="btn btn-primary w-100" onclick="loadFacts()">Поиск</button>
             </div>
-            <div class="col-md-2">
-                <label>&nbsp;</label>
-                <button class="btn btn-success w-100" onclick="exportCSV()">Экспорт CSV</button>
-            </div>
         </div>
     </div>
 
@@ -59,11 +55,29 @@ async function loadFacts() {
         if (data.facts && data.facts.length > 0) {
             data.facts.forEach(fact => {
                 let value = fact.data?.value || 'Нет данных';
+                const typeColor = fact.type === 'vacancy' ? 'success' : (fact.type === 'release' ? 'danger' : 'warning');
+                const typeName = fact.type === 'vacancy' ? 'Вакансия' : (fact.type === 'release' ? 'Релиз' : 'Цена');
+                const date = fact.created_at ? new Date(fact.created_at).toLocaleDateString('ru-RU') : '';
+
+                let sourceLink = '';
+                if (fact.source_url) {
+                    sourceLink = `<a href="${fact.source_url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
+                                    <i class="fas fa-external-link-alt"></i> Перейти к источнику
+                                  </a>`;
+                }
+
                 const card = document.createElement('div');
                 card.className = 'fact-card';
                 card.innerHTML = `
-                    <small class="text-muted">${fact.created_at?.slice(0, 10) || ''}</small>
-                    <div class="mt-2">${value.substring(0, 200)}</div>
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="badge bg-${typeColor} me-2">${typeName}</span>
+                            <span class="badge bg-secondary">достоверность: ${Math.round((fact.confidence || 0.5) * 100)}%</span>
+                        </div>
+                        <small class="text-muted">${date}</small>
+                    </div>
+                    <div class="mt-2"><strong>${escapeHtml(value.substring(0, 250))}</strong></div>
+                    ${sourceLink}
                 `;
                 container.appendChild(card);
             });
@@ -71,7 +85,6 @@ async function loadFacts() {
             container.innerHTML = '<div class="alert alert-info">Факты не найдены</div>';
         }
 
-        // Пагинация
         const pagination = document.getElementById('pagination');
         pagination.innerHTML = '';
         if (totalPages > 1) {
@@ -96,11 +109,10 @@ function goToPage(page) {
     loadFacts();
 }
 
-function exportCSV() {
-    const company = document.getElementById('filterCompany').value;
-    let url = '/api/facts/export/csv';
-    if (company) url += `?company=${company}`;
-    window.location.href = url;
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 document.addEventListener('DOMContentLoaded', loadFacts);
