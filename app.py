@@ -8,11 +8,12 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
 
-from demo_data import DEMO_FACTS, DEMO_SEED_VERSION, DEVELOPER_SITES
+from demo_data import DEMO_FACTS, DEMO_SEED_VERSION, DEVELOPER_SITES, DEVELOPER_NEWS_PAGES
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "ai_radar.db"
 COMPANY_SITES = {name.casefold(): url for name, url in DEVELOPER_SITES.items()}
+NEWS_PAGES = {name.casefold(): url for name, url in DEVELOPER_NEWS_PAGES.items()}
 app = Flask(__name__, template_folder=str(BASE_DIR / "templates"), static_folder=str(BASE_DIR / "static"))
 CORS(app)
 
@@ -56,8 +57,8 @@ def init_db():
         conn.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('demo_seed_version', ?)", (DEMO_SEED_VERSION,))
 
 
-def company_site(developer):
-    return COMPANY_SITES.get((developer or "").strip().casefold())
+def developer_site(developer, sites):
+    return sites.get((developer or "").strip().casefold())
 
 
 def row_to_fact(row):
@@ -65,7 +66,8 @@ def row_to_fact(row):
         data = json.loads(row["fact_data"])
     except (TypeError, json.JSONDecodeError):
         data = {"value": row["fact_data"]}
-    return {"id": row["id"], "type": row["type"], "data": data, "confidence": row["confidence"], "source_url": row["source_url"], "company_url": company_site(data.get("developer")), "created_at": row["created_at"]}
+    developer = data.get("developer")
+    return {"id": row["id"], "type": row["type"], "data": data, "confidence": row["confidence"], "source_url": row["source_url"], "company_url": developer_site(developer, COMPANY_SITES), "news_url": developer_site(developer, NEWS_PAGES), "created_at": row["created_at"]}
 
 
 @app.route("/")

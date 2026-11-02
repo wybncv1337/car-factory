@@ -26,6 +26,31 @@ DEVELOPER_SITES = {
     "Сбер": "https://www.sberbank.com",
 }
 
+# Страницы новостей компаний: кнопка «Читать новость». URL взяты из sources.csv,
+# где источник уже подключён к сборщику; для остальных — официальные пресс-страницы.
+DEVELOPER_NEWS_PAGES = {
+    "OpenAI": "https://openai.com/news/",
+    "Anthropic": "https://www.anthropic.com/news",
+    "Google": "https://blog.google/technology/ai/",
+    "Microsoft": "https://blogs.microsoft.com/blog/tag/ai/",
+    "AWS": "https://aws.amazon.com/about-aws/whats-new/",
+    "Meta": "https://about.fb.com/news/",
+    "Adobe": "https://blog.adobe.com/en/topics/ai",
+    "Canva": "https://www.canva.com/newsroom/",
+    "Figma": "https://www.figma.com/blog/",
+    "GitHub": "https://github.blog/category/ai/",
+    "Hugging Face": "https://huggingface.co/blog",
+    "Mistral AI": "https://mistral.ai/news/",
+    "Perplexity": "https://www.perplexity.ai/hub",
+    "Runway": "https://runwayml.com/news/",
+    "ElevenLabs": "https://elevenlabs.io/blog",
+    "Grammarly": "https://www.grammarly.com/blog/",
+    "Notion": "https://www.notion.so/blog",
+    "Zoom": "https://www.zoom.com/en/blog/",
+    "Яндекс": "https://yandex.ru/company/press_releases/",
+    "Сбер": "https://developers.sber.ru/portal/products/gigachat",
+}
+
 # type, data, страница источника, сколько дней назад произошло
 DEMO_FACTS = [
     # OpenAI
