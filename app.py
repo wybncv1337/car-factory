@@ -1,383 +1,131 @@
-import os
+"""AI Radar — веб-приложение для мониторинга ИИ-инструментов."""
+
 import json
 import sqlite3
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request
-from flask_cors import CORS
 from pathlib import Path
 
-BASE_DIR = Path(__file__).parent
-TEMPLATES_DIR = BASE_DIR / 'templates'
-STATIC_DIR = BASE_DIR / 'static'
+from flask import Flask, jsonify, render_template, request
+from flask_cors import CORS
 
-TEMPLATES_DIR.mkdir(exist_ok=True)
-STATIC_DIR.mkdir(exist_ok=True)
-
-app = Flask(__name__,
-            template_folder=str(TEMPLATES_DIR),
-            static_folder=str(STATIC_DIR))
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH = BASE_DIR / "ai_radar.db"
+app = Flask(__name__, template_folder=str(BASE_DIR / "templates"), static_folder=str(BASE_DIR / "static"))
 CORS(app)
-
-DB_PATH = 'car_factory.db'
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    connection = sqlite3.connect(DB_PATH)
+    connection.row_factory = sqlite3.Row
+    return connection
 
 
-# ==================== СТРАНИЦЫ ====================
+def init_db():
+    """Создаёт отдельную базу AI Radar и наполняет её демонстрационными карточками."""
+    with get_db() as conn:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS facts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL CHECK(type IN ('tool', 'update', 'pricing')),
+                fact_data TEXT NOT NULL,
+                confidence REAL NOT NULL DEFAULT 0.8,
+                source_url TEXT,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        if conn.execute("SELECT COUNT(*) FROM facts").fetchone()[0]:
+            return
+        now = datetime.now()
+        demo_facts = [
+            ("tool", {"name": "ChatGPT", "developer": "OpenAI", "category": "Текст и анализ", "description": "Помогает составлять тексты, анализировать документы и искать идеи.", "price": "Есть бесплатный тариф", "value": "ChatGPT — ИИ-помощник для текста, анализа и рабочих задач."}, "https://chatgpt.com", 0),
+            ("tool", {"name": "Canva AI", "developer": "Canva", "category": "Дизайн", "description": "Создаёт макеты, изображения и презентации по описанию.", "price": "Есть бесплатный тариф", "value": "Canva AI — инструмент для дизайна, постов и презентаций."}, "https://www.canva.com", 1),
+            ("tool", {"name": "GitHub Copilot", "developer": "GitHub", "category": "Разработка", "description": "Подсказывает код и объясняет ошибки прямо в редакторе.", "price": "Платный, есть пробный период", "value": "GitHub Copilot — ИИ-помощник для написания кода."}, "https://github.com/features/copilot", 2),
+            ("update", {"name": "Обновление генерации изображений", "developer": "Adobe", "category": "Дизайн", "description": "Добавлены более точные настройки стиля и редактирование отдельных областей изображения.", "value": "Adobe обновила функции ИИ-генерации изображений."}, "https://www.adobe.com", 3),
+            ("pricing", {"name": "Изменение лимитов", "developer": "Notion", "category": "Продуктивность", "description": "Обновлены лимиты использования ИИ-функций в рабочих пространствах.", "price": "Проверьте условия своего тарифа", "value": "Notion изменила лимиты ИИ-функций в тарифах."}, "https://www.notion.so", 4),
+            ("update", {"name": "Новая функция транскрибации", "developer": "Zoom", "category": "Встречи", "description": "ИИ автоматически делает краткое содержание разговора и список задач.", "value": "Zoom добавил ИИ-резюме встреч и задачи."}, "https://www.zoom.com", 5),
+        ]
+        for fact_type, data, url, days_ago in demo_facts:
+            created_at = (now - timedelta(days=days_ago)).strftime("%Y-%m-%d %H:%M:%S")
+            conn.execute("INSERT INTO facts (type, fact_data, confidence, source_url, created_at) VALUES (?, ?, ?, ?, ?)", (fact_type, json.dumps(data, ensure_ascii=False), 0.9, url, created_at))
 
-@app.route('/')
-def index():
-    return render_template('index.html')
 
-
-@app.route('/facts-feed')
-def facts_feed_page():
-    return render_template('facts_feed.html')
-
-
-@app.route('/companies')
-def companies_page():
-    return render_template('companies.html')
-
-
-@app.route('/company/<company_name>')
-def company_page(company_name):
-    return render_template('company.html', company=company_name)
-
-
-@app.route('/weekly-summary')
-def weekly_summary_page():
-    return render_template('weekly_summary.html')
-
-
-# ==================== API: МЕТРИКИ ====================
-
-@app.route('/api/metrics')
-def get_metrics():
-    conn = get_db()
-    cur = conn.cursor()
-
+def row_to_fact(row):
     try:
-        cur.execute("SELECT COUNT(*) FROM facts")
-        total_docs = cur.fetchone()[0] or 0
-
-        cur.execute("SELECT COUNT(*) FROM facts WHERE type = 'vacancy'")
-        total_vacancies = cur.fetchone()[0] or 0
-
-        cur.execute("SELECT COUNT(*) FROM facts WHERE type = 'release'")
-        total_releases = cur.fetchone()[0] or 0
-
-        cur.execute("SELECT COUNT(*) FROM facts WHERE type = 'price'")
-        total_prices = cur.fetchone()[0] or 0
-
-        cur.execute('''
-                    SELECT DATE (created_at) as date, COUNT (*) as count
-                    FROM facts
-                    WHERE created_at IS NOT NULL
-                    GROUP BY DATE (created_at)
-                    ORDER BY date
-                    ''')
-        daily_stats = []
-        for row in cur.fetchall():
-            daily_stats.append({'date': row['date'], 'count': row['count']})
-
-    except Exception as e:
-        print(f"Error: {e}")
-        total_docs = 0
-        total_vacancies = 0
-        total_releases = 0
-        total_prices = 0
-        daily_stats = []
-
-    conn.close()
-    return jsonify({
-        'total_docs': total_docs,
-        'total_vacancies': total_vacancies,
-        'total_releases': total_releases,
-        'total_prices': total_prices,
-        'daily_stats': daily_stats
-    })
+        data = json.loads(row["fact_data"])
+    except (TypeError, json.JSONDecodeError):
+        data = {"value": row["fact_data"]}
+    return {"id": row["id"], "type": row["type"], "data": data, "confidence": row["confidence"], "source_url": row["source_url"], "created_at": row["created_at"]}
 
 
-# ==================== API: ЛЕНТА ФАКТОВ ====================
+@app.route("/")
+def index(): return render_template("index.html")
 
-@app.route('/api/facts')
+@app.route("/facts-feed")
+def facts_feed_page(): return render_template("facts_feed.html")
+
+@app.route("/developers")
+def developers_page(): return render_template("companies.html")
+
+@app.route("/developer/<developer_name>")
+def developer_page(developer_name): return render_template("company.html", developer=developer_name)
+
+@app.route("/weekly-summary")
+def weekly_summary_page(): return render_template("weekly_summary.html")
+
+
+@app.route("/api/metrics")
+def get_metrics():
+    with get_db() as conn:
+        counts = {row["type"]: row["count"] for row in conn.execute("SELECT type, COUNT(*) AS count FROM facts GROUP BY type")}
+        daily_rows = conn.execute("SELECT DATE(created_at) AS date, COUNT(*) AS count FROM facts GROUP BY DATE(created_at) ORDER BY date").fetchall()
+    return jsonify({"total_facts": sum(counts.values()), "total_tools": counts.get("tool", 0), "total_updates": counts.get("update", 0), "total_pricing": counts.get("pricing", 0), "daily_stats": [dict(row) for row in daily_rows]})
+
+
+@app.route("/api/facts")
 def get_facts():
-    limit = request.args.get('limit', 20, type=int)
-    offset = request.args.get('offset', 0, type=int)
-    company = request.args.get('company')
-    fact_type = request.args.get('type')
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    query = "SELECT * FROM facts"
-    params = []
-    conditions = []
-
-    if company:
-        conditions.append("fact_data LIKE ?")
-        params.append(f'%{company}%')
-
-    if fact_type:
-        conditions.append("type = ?")
-        params.append(fact_type)
-
-    if conditions:
-        query += " WHERE " + " AND ".join(conditions)
-
-    query += " ORDER BY id DESC LIMIT ? OFFSET ?"
-    params.extend([limit, offset])
-
-    cur.execute(query, params)
-
-    facts = []
-    for row in cur.fetchall():
-        fact_data = {}
-        if row['fact_data']:
-            try:
-                fact_data = json.loads(row['fact_data'])
-            except:
-                fact_data = {'value': row['fact_data'][:200]}
-
-        source_url = None
-        try:
-            source_url = row['source_url']
-        except:
-            pass
-
-        facts.append({
-            'id': row['id'],
-            'type': row['type'],
-            'data': fact_data,
-            'confidence': row['confidence'] or 0.5,
-            'created_at': row['created_at'],
-            'source_url': source_url
-        })
-
-    count_query = "SELECT COUNT(*) FROM facts"
-    if conditions:
-        count_query += " WHERE " + " AND ".join(conditions)
-        cur.execute(count_query, params[:len(params) - 2])
-    else:
-        cur.execute(count_query)
-    total = cur.fetchone()[0] or 0
-
-    conn.close()
-    return jsonify({
-        'facts': facts,
-        'total': total,
-        'limit': limit,
-        'offset': offset,
-        'total_pages': (total + limit - 1) // limit if total > 0 else 1
-    })
+    limit, offset = min(request.args.get("limit", 20, type=int), 100), max(request.args.get("offset", 0, type=int), 0)
+    fact_type, developer = request.args.get("type", "").strip(), request.args.get("developer", "").strip()
+    clauses, params = [], []
+    if fact_type in {"tool", "update", "pricing"}: clauses.append("type = ?"); params.append(fact_type)
+    if developer: clauses.append("fact_data LIKE ?"); params.append(f"%{developer}%")
+    where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+    with get_db() as conn:
+        rows = conn.execute(f"SELECT * FROM facts{where} ORDER BY datetime(created_at) DESC, id DESC LIMIT ? OFFSET ?", params + [limit, offset]).fetchall()
+        total = conn.execute(f"SELECT COUNT(*) FROM facts{where}", params).fetchone()[0]
+    return jsonify({"facts": [row_to_fact(row) for row in rows], "total": total, "limit": limit, "offset": offset, "total_pages": max(1, (total + limit - 1) // limit)})
 
 
-# ==================== API: КОМПАНИИ ====================
-
-MULTI_WORD_COMPANIES = [
-    'Aston Martin', 'Alfa Romeo', 'Land Rover', 'Rolls Royce',
-    'General Motors', 'Great Wall', 'Li Auto', 'Lynk Co',
-    'Mercedes-Benz', 'Morgan Motor'
-]
-
-SINGLE_WORD_COMPANIES = [
-    'Tesla', 'BMW', 'Mercedes', 'Audi', 'Volkswagen', 'Porsche',
-    'Toyota', 'Honda', 'Nissan', 'Hyundai', 'Kia', 'Ford',
-    'Chevrolet', 'Cadillac', 'Volvo', 'Subaru', 'Mazda', 'Mitsubishi',
-    'Lexus', 'Acura', 'Infiniti', 'Jaguar', 'Ferrari', 'Lamborghini',
-    'Maserati', 'Bugatti', 'McLaren', 'Bentley', 'Fiat', 'Peugeot',
-    'Citroen', 'Renault', 'Opel', 'Skoda', 'Seat', 'Lada',
-    'АвтоВАЗ', 'ГАЗ', 'УАЗ', 'КАМАЗ', 'BYD', 'Geely', 'Nio', 'Xpeng'
-]
-
-
-def extract_companies_from_text(text):
-    """Извлекает компании из текста"""
-    companies = []
-    text_lower = text.lower()
-
-    for mw in MULTI_WORD_COMPANIES:
-        if mw.lower() in text_lower:
-            companies.append(mw)
-
-    for sw in SINGLE_WORD_COMPANIES:
-        if sw.lower() in text_lower:
-            is_part_of_multi = False
-            for mw in MULTI_WORD_COMPANIES:
-                if sw.lower() in mw.lower() and mw.lower() != sw.lower():
-                    is_part_of_multi = True
-                    break
-            if not is_part_of_multi:
-                companies.append(sw)
-
-    return companies
-
-
-@app.route('/api/companies')
-def get_companies():
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("SELECT fact_data FROM facts")
-    rows = cur.fetchall()
-
-    companies = set()
-
+@app.route("/api/developers")
+def get_developers():
+    with get_db() as conn: rows = conn.execute("SELECT fact_data FROM facts").fetchall()
+    developers = set()
     for row in rows:
         try:
-            data = json.loads(row['fact_data']) if row['fact_data'] else {}
-            text = str(data.get('value', '')) + ' ' + str(data)
-
-            if 'company' in data and data['company']:
-                companies.add(data['company'])
-
-            for c in extract_companies_from_text(text):
-                companies.add(c)
-
-        except:
-            pass
-
-    conn.close()
-
-    multi = [c for c in companies if ' ' in c]
-    single = [c for c in companies if ' ' not in c]
-    result = sorted(multi) + sorted(single)
-
-    return jsonify(result)
+            developer = json.loads(row["fact_data"]).get("developer")
+            if developer: developers.add(developer)
+        except (TypeError, json.JSONDecodeError): pass
+    return jsonify(sorted(developers))
 
 
-@app.route('/api/company/<company_name>')
-def get_company_facts(company_name):
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute('''
-                SELECT *
-                FROM facts
-                WHERE fact_data LIKE ?
-                ORDER BY created_at DESC
-                ''', (f'%{company_name}%',))
-
-    facts = []
-    for row in cur.fetchall():
-        fact_data = {}
-        if row['fact_data']:
-            try:
-                fact_data = json.loads(row['fact_data'])
-            except:
-                fact_data = {'value': row['fact_data'][:200]}
-
-        source_url = None
-        try:
-            source_url = row['source_url']
-        except:
-            pass
-
-        facts.append({
-            'id': row['id'],
-            'type': row['type'],
-            'data': fact_data,
-            'confidence': row['confidence'] or 0.5,
-            'created_at': row['created_at'],
-            'source_url': source_url
-        })
-
-    stats = {
-        'total': len(facts),
-        'vacancies': len([f for f in facts if f['type'] == 'vacancy']),
-        'releases': len([f for f in facts if f['type'] == 'release']),
-        'prices': len([f for f in facts if f['type'] == 'price'])
-    }
-
-    conn.close()
-    return jsonify({
-        'company': company_name,
-        'stats': stats,
-        'facts': facts[:100]
-    })
+@app.route("/api/developer/<developer_name>")
+def get_developer_facts(developer_name):
+    with get_db() as conn: rows = conn.execute("SELECT * FROM facts WHERE fact_data LIKE ? ORDER BY datetime(created_at) DESC", (f"%{developer_name}%",)).fetchall()
+    facts = [row_to_fact(row) for row in rows]
+    return jsonify({"developer": developer_name, "facts": facts, "stats": {"total": len(facts), "tools": sum(f["type"] == "tool" for f in facts), "updates": sum(f["type"] == "update" for f in facts), "pricing": sum(f["type"] == "pricing" for f in facts)}})
 
 
-# ==================== API: СВОДКА (С ТОП КОМПАНИЙ) ====================
-
-@app.route('/api/weekly-summary')
+@app.route("/api/weekly-summary")
 def get_weekly_summary():
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=7)
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    # Динамика по дням
-    cur.execute('''
-                SELECT DATE (created_at) as date, COUNT (*) as count
-                FROM facts
-                WHERE created_at >= ?
-                GROUP BY DATE (created_at)
-                ORDER BY date
-                ''', (start_date,))
-
-    news_by_day = [{'date': row['date'], 'count': row['count']} for row in cur.fetchall()]
-
-    # Новые факты по типам
-    cur.execute("SELECT COUNT(*) FROM facts WHERE created_at >= ? AND type = 'vacancy'", (start_date,))
-    new_vacancies = cur.fetchone()[0] or 0
-
-    cur.execute("SELECT COUNT(*) FROM facts WHERE created_at >= ? AND type = 'release'", (start_date,))
-    new_releases = cur.fetchone()[0] or 0
-
-    cur.execute("SELECT COUNT(*) FROM facts WHERE created_at >= ? AND type = 'price'", (start_date,))
-    new_prices = cur.fetchone()[0] or 0
-
-    # ТОП КОМПАНИЙ — извлекаем из текста фактов
-    cur.execute("SELECT fact_data FROM facts WHERE created_at >= ?", (start_date,))
-    rows = cur.fetchall()
-
-    company_counts = {}
-    for row in rows:
-        try:
-            data = json.loads(row['fact_data']) if row['fact_data'] else {}
-            text = str(data.get('value', '')) + ' ' + str(data)
-
-            # Ищем компании в тексте
-            found = extract_companies_from_text(text)
-
-            # Также проверяем поле company
-            if 'company' in data and data['company']:
-                found.append(data['company'])
-
-            for company in set(found):
-                company_counts[company] = company_counts.get(company, 0) + 1
-        except:
-            pass
-
-    # Сортируем топ-10
-    top_companies = [
-        {'name': name, 'count': count}
-        for name, count in sorted(company_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-    ]
-
-    conn.close()
-
-    return jsonify({
-        'period': {
-            'start': start_date.strftime('%Y-%m-%d'),
-            'end': end_date.strftime('%Y-%m-%d')
-        },
-        'news_by_day': news_by_day,
-        'new_vacancies': new_vacancies,
-        'new_releases': new_releases,
-        'new_prices': new_prices,
-        'top_companies': top_companies
-    })
+    start_date = datetime.now() - timedelta(days=7)
+    with get_db() as conn: rows = conn.execute("SELECT * FROM facts WHERE datetime(created_at) >= ? ORDER BY datetime(created_at)", (start_date.strftime("%Y-%m-%d %H:%M:%S"),)).fetchall()
+    facts, by_day, developer_counts = [row_to_fact(row) for row in rows], {}, {}
+    for fact in facts:
+        by_day[fact["created_at"][:10]] = by_day.get(fact["created_at"][:10], 0) + 1
+        developer = fact["data"].get("developer")
+        if developer: developer_counts[developer] = developer_counts.get(developer, 0) + 1
+    return jsonify({"news_by_day": [{"date": date, "count": count} for date, count in sorted(by_day.items())], "new_tools": sum(f["type"] == "tool" for f in facts), "new_updates": sum(f["type"] == "update" for f in facts), "new_pricing": sum(f["type"] == "pricing" for f in facts), "top_developers": [{"name": name, "count": count} for name, count in sorted(developer_counts.items(), key=lambda item: item[1], reverse=True)[:10]]})
 
 
-# ==================== ЗАПУСК ====================
+init_db()
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+if __name__ == "__main__": app.run(host="0.0.0.0", port=5000, debug=True)

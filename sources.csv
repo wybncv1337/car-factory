@@ -1,10 +1,8 @@
-company,type,url,name
-Volkswagen,html,https://volkswagen-russia.ru/,Официальный сайт
-Volkswagen,rss,https://www.volkswagen-newsroom.com/rss,Новости RSS
-Volkswagen,html,https://jobs.volkswagen-group.com/,Вакансии
-Toyota,html,https://www.toyota.ru/,Официальный сайт
-Toyota,rss,https://www.toyota.ru/rss/news.xml,Новости RSS
-BMW,html,https://www.bmw.ru/,Официальный сайт
-BMW,rss,https://www.bmwgroup.com/en/news/rss,Новости RSS
-Tesla,html,https://www.tesla.com/,Официальный сайт
-Tesla,html,https://www.tesla.com/careers,Вакансии
+developer,type,url,name
+OpenAI,html,https://openai.com/news/,Новости OpenAI
+Google,html,https://blog.google/technology/ai/,Google AI Blog
+Anthropic,html,https://www.anthropic.com/news,Новости Anthropic
+Microsoft,html,https://blogs.microsoft.com/blog/tag/ai/,Microsoft AI Blog
+Adobe,html,https://blog.adobe.com/en/topics/ai,Adobe AI Blog
+Canva,html,https://www.canva.com/newsroom/,Новости Canva
+Hugging Face,html,https://huggingface.co/blog,Hugging Face Blog
