@@ -12,6 +12,7 @@ from demo_data import DEMO_FACTS, DEMO_SEED_VERSION, DEVELOPER_SITES, DEVELOPER_
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "ai_radar.db"
+DAYS_WINDOW = 60
 COMPANY_SITES = {name.casefold(): url for name, url in DEVELOPER_SITES.items()}
 NEWS_PAGES = {name.casefold(): url for name, url in DEVELOPER_NEWS_PAGES.items()}
 app = Flask(__name__, template_folder=str(BASE_DIR / "templates"), static_folder=str(BASE_DIR / "static"))
@@ -24,9 +25,20 @@ def get_db():
     return connection
 
 
+def ensure_schema(conn):
+    """Подтягивает колонки новых версий схемы в уже существующей базе."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(facts)")}
+    if "news_url" not in columns:
+        conn.execute("ALTER TABLE facts ADD COLUMN news_url TEXT")
+    if "is_demo" not in columns:
+        # Всё, что попало в базу до появления сборщика, — демонстрационные карточки.
+        conn.execute("ALTER TABLE facts ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 1")
+
+
 def init_db():
     """Создаёт базу и один раз загружает сбалансированную витрину за 60 дней."""
-    with get_db() as conn:
+    conn = get_db()
+    try:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS facts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,6 +46,8 @@ def init_db():
                 fact_data TEXT NOT NULL,
                 confidence REAL NOT NULL DEFAULT 0.8,
                 source_url TEXT,
+                news_url TEXT,
+                is_demo INTEGER NOT NULL DEFAULT 0,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             CREATE TABLE IF NOT EXISTS app_settings (
@@ -41,20 +55,25 @@ def init_db():
                 value TEXT NOT NULL
             );
         """)
+        ensure_schema(conn)
+        conn.commit()  # ALTER TABLE должен сохраниться даже если пересид не требуется
         row = conn.execute("SELECT value FROM app_settings WHERE key = 'demo_seed_version'").fetchone()
         if row and row["value"] == DEMO_SEED_VERSION:
             return
 
-        # До подключения настоящего сборщика все существующие записи — тестовые.
-        conn.execute("DELETE FROM facts")
+        # Пересид затрагивает только демо-записи: собранные новости остаются в базе.
+        conn.execute("DELETE FROM facts WHERE is_demo = 1")
         now = datetime.now()
         for fact_type, data, url, days_ago in DEMO_FACTS:
             created_at = (now - timedelta(days=days_ago)).strftime("%Y-%m-%d %H:%M:%S")
             conn.execute(
-                "INSERT INTO facts (type, fact_data, confidence, source_url, created_at) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO facts (type, fact_data, confidence, source_url, created_at, is_demo) VALUES (?, ?, ?, ?, ?, 1)",
                 (fact_type, json.dumps(data, ensure_ascii=False), 0.9, url, created_at),
             )
         conn.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('demo_seed_version', ?)", (DEMO_SEED_VERSION,))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def developer_site(developer, sites):
@@ -67,7 +86,9 @@ def row_to_fact(row):
     except (TypeError, json.JSONDecodeError):
         data = {"value": row["fact_data"]}
     developer = data.get("developer")
-    return {"id": row["id"], "type": row["type"], "data": data, "confidence": row["confidence"], "source_url": row["source_url"], "company_url": developer_site(developer, COMPANY_SITES), "news_url": developer_site(developer, NEWS_PAGES), "created_at": row["created_at"]}
+    # У собранных новостей ссылка на статью лежит в базе, у демо-карточек — в карте разделов.
+    news_url = row["news_url"] or developer_site(developer, NEWS_PAGES)
+    return {"id": row["id"], "type": row["type"], "data": data, "confidence": row["confidence"], "source_url": row["source_url"], "company_url": developer_site(developer, COMPANY_SITES), "news_url": news_url, "created_at": row["created_at"]}
 
 
 @app.route("/")
@@ -95,12 +116,29 @@ def weekly_summary_page():
     return render_template("weekly_summary.html")
 
 
+def daily_breakdown(conn, days=DAYS_WINDOW):
+    """Counts per day split by type, zero-filled so quiet days stay visible on the chart."""
+    rows = conn.execute("SELECT DATE(created_at) AS date, type, COUNT(*) AS count FROM facts GROUP BY DATE(created_at), type").fetchall()
+    today = datetime.now().date()
+    stats = [
+        {"date": (today - timedelta(days=offset)).strftime("%Y-%m-%d"), "tool": 0, "update": 0, "pricing": 0, "total": 0}
+        for offset in range(days - 1, -1, -1)
+    ]
+    by_date = {item["date"]: item for item in stats}
+    for row in rows:
+        item = by_date.get(row["date"])
+        if item and row["type"] in item:
+            item[row["type"]] = row["count"]
+            item["total"] += row["count"]
+    return stats
+
+
 @app.route("/api/metrics")
 def get_metrics():
     with get_db() as conn:
         counts = {row["type"]: row["count"] for row in conn.execute("SELECT type, COUNT(*) AS count FROM facts GROUP BY type")}
-        daily_rows = conn.execute("SELECT DATE(created_at) AS date, COUNT(*) AS count FROM facts GROUP BY DATE(created_at) ORDER BY date").fetchall()
-    return jsonify({"total_facts": sum(counts.values()), "total_tools": counts.get("tool", 0), "total_updates": counts.get("update", 0), "total_pricing": counts.get("pricing", 0), "daily_stats": [dict(row) for row in daily_rows]})
+        daily_stats = daily_breakdown(conn)
+    return jsonify({"total_facts": sum(counts.values()), "total_tools": counts.get("tool", 0), "total_updates": counts.get("update", 0), "total_pricing": counts.get("pricing", 0), "daily_stats": daily_stats})
 
 
 @app.route("/api/facts")
