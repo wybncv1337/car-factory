@@ -1,1 +1,48 @@
-{% extends "base.html" %}{% block content %}<h2>Разработчики ИИ-инструментов</h2><div class="filter-card"><input id="search" class="form-control" placeholder="Найти разработчика" oninput="render()"></div><div id="list" class="row mt-3"></div><script>let all=[];async function load(){all=await (await fetch('/api/developers')).json();render()}function render(){let q=search.value.toLowerCase();list.innerHTML=all.filter(x=>x.toLowerCase().includes(q)).map(x=>`<div class="col-md-4 mb-3"><a class="text-decoration-none" href="/developer/${encodeURIComponent(x)}"><div class="card p-4 h-100"><i class="fa-solid fa-building text-primary mb-2"></i><h5 class="mb-0">${x}</h5></div></a></div>`).join('')||'<p class="text-muted">Нет данных.</p>'}load()</script>{% endblock %}
+{% extends "base.html" %}
+{% block content %}
+<header class="page-head">
+  <p class="eyebrow">Компании</p>
+  <h1>Разработчики ИИ-инструментов</h1>
+  <p>Заходи в карточку компании, чтобы увидеть все её анонсы, обновления и изменения тарифов в одном месте.</p>
+</header>
+
+<section class="panel mb-4">
+  <label class="form-label" for="search">Поиск</label>
+  <input id="search" class="form-control" placeholder="Например, Anthropic или Яндекс" oninput="render()">
+</section>
+
+<div id="list" class="row g-3"></div>
+
+<script>
+  let all = [];
+
+  function esc(value) {
+    const node = document.createElement('span');
+    node.textContent = value || '';
+    return node.innerHTML;
+  }
+
+  function render() {
+    const query = search.value.trim().toLowerCase();
+    const matches = all.filter(name => name.toLowerCase().includes(query));
+    list.innerHTML = matches.length
+      ? matches.map(name => `<div class="col-md-6 col-xl-4">
+          <a class="dev-card" href="/developer/${encodeURIComponent(name)}">
+            <span class="dev-avatar">${esc(name.trim().charAt(0))}</span>
+            <span>
+              <h3>${esc(name)}</h3>
+              <span class="dev-sub">Смотреть события <i class="fa-solid fa-arrow-right-long ms-1"></i></span>
+            </span>
+          </a>
+        </div>`).join('')
+      : '<div class="empty"><i class="fa-solid fa-magnifying-glass"></i>Никого не нашли по запросу.</div>';
+  }
+
+  async function load() {
+    all = await (await fetch('/api/developers')).json();
+    render();
+  }
+
+  load();
+</script>
+{% endblock %}

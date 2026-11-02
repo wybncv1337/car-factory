@@ -1,1 +1,94 @@
-{% extends "base.html" %}{% block content %}<h2>Сводка за неделю</h2><div class="row g-3 my-3"><div class="col-md-4"><div class="card p-3">Новые инструменты<h2 id="tools">—</h2></div></div><div class="col-md-4"><div class="card p-3">Обновления<h2 id="updates">—</h2></div></div><div class="col-md-4"><div class="card p-3">Изменения тарифов<h2 id="pricing">—</h2></div></div></div><div class="filter-card"><h5>Активность по дням</h5><div id="chart"></div></div><div class="filter-card mt-4"><h5>Самые упоминаемые разработчики</h5><div id="developers"></div></div><script>async function load(){let d=await (await fetch('/api/weekly-summary')).json();tools.textContent=d.new_tools;updates.textContent=d.new_updates;pricing.textContent=d.new_pricing;Plotly.newPlot('chart',[{x:d.news_by_day.map(x=>x.date),y:d.news_by_day.map(x=>x.count),type:'bar',marker:{color:'#6366f1'}}],{margin:{t:10},height:260});developers.innerHTML=d.top_developers.map(x=>`<div class="d-flex justify-content-between border-bottom py-2"><a href="/developer/${encodeURIComponent(x.name)}">${x.name}</a><b>${x.count}</b></div>`).join('')||'Нет событий за неделю.'}load()</script>{% endblock %}
+{% extends "base.html" %}
+{% block content %}
+<header class="page-head">
+  <p class="eyebrow">Итоги за 7 дней</p>
+  <h1>Сводка за неделю</h1>
+  <p>Чем рынок ИИ жил в последние семь дней: сколько появилось инструментов, обновлений и правок тарифов.</p>
+</header>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="stat" style="--tone: var(--tool)">
+      <div class="stat-icon"><i class="fa-solid fa-rocket"></i></div>
+      <div class="stat-value" id="tools">—</div>
+      <div class="stat-label">Новые инструменты</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat" style="--tone: var(--update)">
+      <div class="stat-icon"><i class="fa-solid fa-arrows-rotate"></i></div>
+      <div class="stat-value" id="updates">—</div>
+      <div class="stat-label">Обновления</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat" style="--tone: var(--pricing)">
+      <div class="stat-icon"><i class="fa-solid fa-tags"></i></div>
+      <div class="stat-value" id="pricing">—</div>
+      <div class="stat-label">Изменения тарифов</div>
+    </div>
+  </div>
+</div>
+
+<section class="panel mb-4">
+  <div class="panel-head">
+    <div>
+      <h2>Активность по дням</h2>
+      <span class="hint">Сколько событий попадало в ленту за каждый день недели</span>
+    </div>
+  </div>
+  <div id="chart"></div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>Самые упоминаемые разработчики</h2>
+      <span class="hint">Топ недели по количеству событий</span>
+    </div>
+  </div>
+  <div id="developers"></div>
+</section>
+
+<script>
+  function esc(value) {
+    const node = document.createElement('span');
+    node.textContent = value || '';
+    return node.innerHTML;
+  }
+
+  async function load() {
+    const data = await (await fetch('/api/weekly-summary')).json();
+    tools.textContent = data.new_tools;
+    updates.textContent = data.new_updates;
+    pricing.textContent = data.new_pricing;
+    Plotly.newPlot('chart', [{
+      x: data.news_by_day.map(day => day.date),
+      y: data.news_by_day.map(day => day.count),
+      type: 'bar',
+      marker: { color: '#6366f1', line: { width: 0 } },
+      hovertemplate: '%{x}<br>Событий: %{y}<extra></extra>'
+    }], {
+      margin: { t: 10, r: 10, b: 42, l: 40 },
+      height: 280,
+      bargap: 0.4,
+      font: { family: 'Manrope, sans-serif', color: '#6f6a88', size: 12 },
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      yaxis: { rangemode: 'tozero', dtick: 1, gridcolor: '#eceaf7', zeroline: false },
+      xaxis: { tickformat: '%d %b', gridcolor: '#eceaf7', zeroline: false },
+      showlegend: false,
+      hovermode: 'x'
+    }, { displayModeBar: false, responsive: true });
+    developers.innerHTML = data.top_developers.length
+      ? data.top_developers.map((item, index) => `<div class="rank-row">
+          <span class="rank-pos">${index + 1}</span>
+          <a href="/developer/${encodeURIComponent(item.name)}">${esc(item.name)}</a>
+          <span class="rank-count">${item.count}</span>
+        </div>`).join('')
+      : '<div class="empty"><i class="fa-regular fa-calendar"></i>За неделю новых событий не было.</div>';
+  }
+
+  load();
+</script>
+{% endblock %}

@@ -1,1 +1,84 @@
-{% extends "base.html" %}{% block content %}<h2>Лента событий</h2><div class="filter-card my-3 row g-3"><div class="col-md-4"><label class="form-label">Тип события</label><select id="type" class="form-select"><option value="">Все события</option><option value="tool">Новые инструменты</option><option value="update">Обновления</option><option value="pricing">Тарифы и лимиты</option></select></div><div class="col-md-5"><label class="form-label">Разработчик</label><input id="developer" class="form-control" placeholder="Например, OpenAI"></div><div class="col-md-3 d-flex align-items-end"><button class="btn btn-primary w-100" onclick="load()">Показать</button></div></div><div id="facts"></div><script>const labels={tool:'Инструмент',update:'Обновление',pricing:'Тариф'};function esc(v){let x=document.createElement('span');x.textContent=v||'';return x.innerHTML}function btn(u,t,i){return u?`<a class="btn btn-sm btn-outline-primary me-1" href="${esc(u)}" target="_blank" rel="noopener"><i class="fa-solid ${i} me-1"></i>${t}</a>`:''}async function load(){let q=new URLSearchParams({limit:100});if(type.value)q.set('type',type.value);if(developer.value)q.set('developer',developer.value);let d=await (await fetch('/api/facts?'+q)).json();facts.innerHTML=d.facts.length?d.facts.map(f=>{let x=f.data;return `<article class="fact-card"><span class="badge bg-primary">${labels[f.type]}</span><span class="text-muted ms-2">${esc(x.developer||'')}</span><small class="text-muted float-end"><i class="fa-regular fa-calendar me-1"></i>${dateLabel(f.created_at)}</small><h5 class="mt-2">${esc(x.name||x.value)}</h5><p>${esc(x.description||'')}</p>${x.price?`<p><b>${esc(x.price)}</b></p>`:''}${btn(f.company_url,'Сайт компании','fa-building')+btn(f.news_url,'Читать новость','fa-newspaper')+btn(f.source_url,'Сайт продукта','fa-arrow-up-right-from-square')}</article>`}).join(''):'<div class="alert alert-info">Ничего не найдено.</div>'}load()</script>{% endblock %}
+{% extends "base.html" %}
+{% block content %}
+<header class="page-head">
+  <p class="eyebrow">Хроника</p>
+  <h1>Лента событий</h1>
+  <p>Все собранные анонсы за последние два месяца. Фильтры помогают сузить ленту до конкретного типа или разработчика.</p>
+</header>
+
+<section class="panel mb-4">
+  <div class="row g-3 align-items-end">
+    <div class="col-md-5">
+      <label class="form-label" for="type">Тип события</label>
+      <select id="type" class="form-select">
+        <option value="">Все события</option>
+        <option value="tool">Новые инструменты</option>
+        <option value="update">Обновления</option>
+        <option value="pricing">Тарифы и лимиты</option>
+      </select>
+    </div>
+    <div class="col-md-5">
+      <label class="form-label" for="developer">Разработчик</label>
+      <input id="developer" class="form-control" placeholder="Например, OpenAI">
+    </div>
+    <div class="col-md-2 d-grid">
+      <button class="btn btn-primary" onclick="load()"><i class="fa-solid fa-magnifying-glass me-2"></i>Показать</button>
+    </div>
+  </div>
+</section>
+
+<div class="section-title">
+  <h2>Найдено: <span id="count">—</span></h2>
+</div>
+<div id="facts"></div>
+
+<script>
+  const badge = { tool: 'Инструмент', update: 'Обновление', pricing: 'Тариф' };
+
+  function esc(value) {
+    const node = document.createElement('span');
+    node.textContent = value || '';
+    return node.innerHTML;
+  }
+
+  function link(url, title, icon, primary) {
+    if (!url) return '';
+    return `<a class="link-btn${primary ? ' primary' : ''}" href="${esc(url)}" target="_blank" rel="noopener"><i class="fa-solid ${icon}"></i>${title}</a>`;
+  }
+
+  function card(f) {
+    const d = f.data;
+    const developer = d.developer ? `<a class="chip" href="/developer/${encodeURIComponent(d.developer)}"><i class="fa-solid fa-building"></i>${esc(d.developer)}</a>` : '';
+    const category = d.category ? `<span class="chip">${esc(d.category)}</span>` : '';
+    const price = d.price ? `<div class="price-note"><i class="fa-solid fa-tag"></i>${esc(d.price)}</div>` : '';
+    return `<article class="fact-card is-${f.type}">
+      <div class="fact-top">
+        <span class="type-badge">${badge[f.type]}</span>
+        ${developer}${category}
+        <span class="fact-date"><i class="fa-regular fa-calendar"></i>${dateLabel(f.created_at)}</span>
+      </div>
+      <h3>${esc(d.name || d.value)}</h3>
+      <p class="desc">${esc(d.description || '')}</p>
+      ${price}
+      <div class="fact-links">
+        ${link(f.news_url, 'Читать новость', 'fa-newspaper', true)}
+        ${link(f.company_url, 'Сайт компании', 'fa-building')}
+        ${link(f.source_url, 'Сайт продукта', 'fa-arrow-up-right-from-square')}
+      </div>
+    </article>`;
+  }
+
+  async function load() {
+    const query = new URLSearchParams({ limit: 100 });
+    if (type.value) query.set('type', type.value);
+    if (developer.value) query.set('developer', developer.value);
+    const data = await (await fetch('/api/facts?' + query)).json();
+    count.textContent = data.total;
+    facts.innerHTML = data.facts.length
+      ? data.facts.map(card).join('')
+      : '<div class="empty"><i class="fa-regular fa-folder-open"></i>По такому запросу событий нет — попробуйте другого разработчика.</div>';
+  }
+
+  load();
+</script>
+{% endblock %}

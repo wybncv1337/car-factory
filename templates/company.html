@@ -1,1 +1,96 @@
-{% extends "base.html" %}{% block content %}<h2 id="name">{{ developer }}</h2><p class="text-muted">События, связанные с этим разработчиком.</p><div class="row g-3 mb-4"><div class="col-md-3"><div class="card p-3">Всего<h2 id="total">—</h2></div></div><div class="col-md-3"><div class="card p-3">Инструменты<h2 id="tools">—</h2></div></div><div class="col-md-3"><div class="card p-3">Обновления<h2 id="updates">—</h2></div></div><div class="col-md-3"><div class="card p-3">Тарифы<h2 id="pricing">—</h2></div></div></div><div id="facts"></div><script>function esc(v){let e=document.createElement('span');e.textContent=v||'';return e.innerHTML}function btn(u,t){return u?`<a class="btn btn-sm btn-outline-primary me-1" href="${esc(u)}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-1"></i>${t}</a>`:''}async function load(){let d=await (await fetch('/api/developer/{{ developer|urlencode }}')).json();total.textContent=d.stats.total;tools.textContent=d.stats.tools;updates.textContent=d.stats.updates;pricing.textContent=d.stats.pricing;facts.innerHTML=d.facts.map(f=>`<article class="fact-card"><b>${esc(f.data.name||f.data.value)}</b><small class="text-muted float-end"><i class="fa-regular fa-calendar me-1"></i>${dateLabel(f.created_at)}</small><p class="mb-1 mt-2">${esc(f.data.description||'')}</p>${btn(f.company_url,'Сайт компании')+btn(f.news_url,'Читать новость')+btn(f.source_url,'Сайт продукта')}</article>`).join('')}load()</script>{% endblock %}
+{% extends "base.html" %}
+{% block content %}
+<header class="page-head">
+  <p class="eyebrow"><a href="/developers" class="text-decoration-none"><i class="fa-solid fa-arrow-left-long me-1"></i>Все разработчики</a></p>
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <span class="dev-avatar">{{ developer|first }}</span>
+    <div>
+      <h1>{{ developer }}</h1>
+      <p>События, которые мы собрали по этой компании: новые инструменты, обновления и правки тарифов.</p>
+    </div>
+    <div class="fact-links ms-auto" id="official"></div>
+  </div>
+</header>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="stat">
+      <div class="stat-icon"><i class="fa-solid fa-layer-group"></i></div>
+      <div class="stat-value" id="total">—</div>
+      <div class="stat-label">Всего событий</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="stat" style="--tone: var(--tool)">
+      <div class="stat-icon"><i class="fa-solid fa-rocket"></i></div>
+      <div class="stat-value" id="tools">—</div>
+      <div class="stat-label">Инструменты</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="stat" style="--tone: var(--update)">
+      <div class="stat-icon"><i class="fa-solid fa-arrows-rotate"></i></div>
+      <div class="stat-value" id="updates">—</div>
+      <div class="stat-label">Обновления</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="stat" style="--tone: var(--pricing)">
+      <div class="stat-icon"><i class="fa-solid fa-tags"></i></div>
+      <div class="stat-value" id="pricing">—</div>
+      <div class="stat-label">Тарифы</div>
+    </div>
+  </div>
+</div>
+
+<div id="facts"></div>
+
+<script>
+  const badge = { tool: 'Инструмент', update: 'Обновление', pricing: 'Тариф' };
+
+  function esc(value) {
+    const node = document.createElement('span');
+    node.textContent = value || '';
+    return node.innerHTML;
+  }
+
+  function link(url, title, icon, primary) {
+    if (!url) return '';
+    return `<a class="link-btn${primary ? ' primary' : ''}" href="${esc(url)}" target="_blank" rel="noopener"><i class="fa-solid ${icon}"></i>${title}</a>`;
+  }
+
+  function card(f) {
+    const d = f.data;
+    const category = d.category ? `<span class="chip">${esc(d.category)}</span>` : '';
+    const price = d.price ? `<div class="price-note"><i class="fa-solid fa-tag"></i>${esc(d.price)}</div>` : '';
+    return `<article class="fact-card is-${f.type}">
+      <div class="fact-top">
+        <span class="type-badge">${badge[f.type]}</span>
+        ${category}
+        <span class="fact-date"><i class="fa-regular fa-calendar"></i>${dateLabel(f.created_at)}</span>
+      </div>
+      <h3>${esc(d.name || d.value)}</h3>
+      <p class="desc">${esc(d.description || '')}</p>
+      ${price}
+      <div class="fact-links">
+        ${link(f.news_url, 'Читать новость', 'fa-newspaper', true)}
+        ${link(f.source_url, 'Сайт продукта', 'fa-arrow-up-right-from-square')}
+      </div>
+    </article>`;
+  }
+
+  async function load() {
+    const data = await (await fetch('/api/developer/{{ developer|urlencode }}')).json();
+    total.textContent = data.stats.total;
+    tools.textContent = data.stats.tools;
+    updates.textContent = data.stats.updates;
+    pricing.textContent = data.stats.pricing;
+    official.innerHTML = data.facts.length ? link(data.facts[0].company_url, 'Официальный сайт', 'fa-building', true) : '';
+    facts.innerHTML = data.facts.length
+      ? data.facts.map(card).join('')
+      : '<div class="empty"><i class="fa-regular fa-folder-open"></i>По этой компании событий пока нет.</div>';
+  }
+
+  load();
+</script>
+{% endblock %}

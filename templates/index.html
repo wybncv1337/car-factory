@@ -1,1 +1,158 @@
-{% extends "base.html" %}{% block content %}<h2>AI News</h2><p class="text-muted">Новости об ИИ-инструментах, обновлениях и изменениях тарифов за последние два месяца.</p><div class="row g-3 my-3"><div class="col-md-3"><div class="card p-3"><small>Всего событий</small><h2 id="all">—</h2></div></div><div class="col-md-3"><div class="card p-3"><small>Инструменты</small><h2 id="tools" class="text-primary">—</h2></div></div><div class="col-md-3"><div class="card p-3"><small>Обновления</small><h2 id="updates" class="text-success">—</h2></div></div><div class="col-md-3"><div class="card p-3"><small>Тарифы и лимиты</small><h2 id="pricing" class="text-warning">—</h2></div></div></div><div class="filter-card mb-4"><h5>Динамика событий за 60 дней</h5><small class="text-muted d-block mb-3">Столбики — события по типам за день, линия — среднее за 7 дней</small><div id="chart"></div></div><h4>Последние события</h4><div id="facts"></div><script>const labels={tool:'Инструмент',update:'Обновление',pricing:'Тариф'};function esc(v){let e=document.createElement('span');e.textContent=v||'';return e.innerHTML}function card(f){let d=f.data;let btn=(u,t)=>u?`<a class="btn btn-sm btn-outline-primary mt-2 me-1" href="${esc(u)}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-1"></i>${t}</a>`:'';let link=btn(f.company_url,'Сайт компании')+btn(f.news_url,'Читать новость')+btn(f.source_url,'Сайт продукта');return `<article class="fact-card"><span class="badge bg-primary">${labels[f.type]}</span><span class="text-muted ms-2">${esc(d.developer||'Без разработчика')} · ${esc(d.category||'')}</span><small class="text-muted float-end"><i class="fa-regular fa-calendar me-1"></i>${dateLabel(f.created_at)}</small><h5 class="mt-2">${esc(d.name||d.value)}</h5><p class="mb-1">${esc(d.description||'')}</p>${d.price?`<small><b>${esc(d.price)}</b></small>`:''}<br>${link}</article>`}function moving(values,size){return values.map((v,i)=>{let part=values.slice(Math.max(0,i-size+1),i+1);return +(part.reduce((a,b)=>a+b,0)/part.length).toFixed(2)})}function chart(days){let x=days.map(d=>d.date);let series={tool:['Инструменты','#6366f1'],update:['Обновления','#22c55e'],pricing:['Тарифы и лимиты','#f59e0b']};let traces=Object.keys(series).map(key=>({x:x,y:days.map(d=>d[key]),type:'bar',name:series[key][0],marker:{color:series[key][1]},hovertemplate:'%{x}<br>'+series[key][0]+': %{y}<extra></extra>'}));traces.push({x:x,y:moving(days.map(d=>d.total),7),type:'scatter',mode:'lines',name:'Среднее за 7 дней',line:{color:'#0f172a',width:2.5,shape:'spline'},hovertemplate:'%{x}<br>Среднее за 7 дней: %{y}<extra></extra>'});Plotly.newPlot('chart',traces,{margin:{t:10,r:10,b:40,l:40},height:320,barmode:'stack',bargap:0.3,yaxis:{title:'Событий в день',rangemode:'tozero',dtick:1},xaxis:{tickformat:'%d %b',nticks:10},legend:{orientation:'h',y:1.12},hovermode:'x unified'},{displayModeBar:false,responsive:true})}async function load(){let m=await (await fetch('/api/metrics')).json();all.textContent=m.total_facts;tools.textContent=m.total_tools;updates.textContent=m.total_updates;pricing.textContent=m.total_pricing;chart(m.daily_stats);let d=await (await fetch('/api/facts?limit=5')).json();facts.innerHTML=d.facts.map(card).join('')}load()</script>{% endblock %}
+{% extends "base.html" %}
+{% block content %}
+<header class="page-head">
+  <p class="eyebrow">Обзор рынка ИИ</p>
+  <h1>Что изменилось за последние два месяца</h1>
+  <p>Новые инструменты, обновления сервисов и правки тарифов — каждая карточка ведёт на страницу компании-разработчика и на конкретный анонс.</p>
+</header>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="stat">
+      <div class="stat-icon"><i class="fa-solid fa-layer-group"></i></div>
+      <div class="stat-value" id="all">—</div>
+      <div class="stat-label">Всего событий</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="stat" style="--tone: var(--tool)">
+      <div class="stat-icon"><i class="fa-solid fa-rocket"></i></div>
+      <div class="stat-value" id="tools">—</div>
+      <div class="stat-label">Новые инструменты</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="stat" style="--tone: var(--update)">
+      <div class="stat-icon"><i class="fa-solid fa-arrows-rotate"></i></div>
+      <div class="stat-value" id="updates">—</div>
+      <div class="stat-label">Обновления</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="stat" style="--tone: var(--pricing)">
+      <div class="stat-icon"><i class="fa-solid fa-tags"></i></div>
+      <div class="stat-value" id="pricing">—</div>
+      <div class="stat-label">Тарифы и лимиты</div>
+    </div>
+  </div>
+</div>
+
+<section class="panel mb-4">
+  <div class="panel-head">
+    <div>
+      <h2>Динамика событий за 60 дней</h2>
+      <span class="hint">Столбики — типы событий по дням, линия — среднее за 7 дней</span>
+    </div>
+    <ul class="legend">
+      <li><span style="--tone: #6366f1"></span>Инструменты</li>
+      <li><span style="--tone: #22c55e"></span>Обновления</li>
+      <li><span style="--tone: #f59e0b"></span>Тарифы</li>
+      <li><span style="--tone: #181233"></span>Среднее за 7 дней</li>
+    </ul>
+  </div>
+  <div id="chart"></div>
+</section>
+
+<div class="section-title">
+  <h2>Последние события</h2>
+  <a href="/facts-feed">Вся лента <i class="fa-solid fa-arrow-right-long ms-1"></i></a>
+</div>
+<div id="facts"></div>
+
+<script>
+  const badge = { tool: 'Инструмент', update: 'Обновление', pricing: 'Тариф' };
+  const series = {
+    tool: { label: 'Инструменты', color: '#6366f1' },
+    update: { label: 'Обновления', color: '#22c55e' },
+    pricing: { label: 'Тарифы и лимиты', color: '#f59e0b' }
+  };
+
+  function esc(value) {
+    const node = document.createElement('span');
+    node.textContent = value || '';
+    return node.innerHTML;
+  }
+
+  function link(url, title, icon, primary) {
+    if (!url) return '';
+    return `<a class="link-btn${primary ? ' primary' : ''}" href="${esc(url)}" target="_blank" rel="noopener"><i class="fa-solid ${icon}"></i>${title}</a>`;
+  }
+
+  function card(f) {
+    const d = f.data;
+    const developer = d.developer ? `<a class="chip" href="/developer/${encodeURIComponent(d.developer)}"><i class="fa-solid fa-building"></i>${esc(d.developer)}</a>` : '';
+    const category = d.category ? `<span class="chip">${esc(d.category)}</span>` : '';
+    const price = d.price ? `<div class="price-note"><i class="fa-solid fa-tag"></i>${esc(d.price)}</div>` : '';
+    return `<article class="fact-card is-${f.type}">
+      <div class="fact-top">
+        <span class="type-badge">${badge[f.type]}</span>
+        ${developer}${category}
+        <span class="fact-date"><i class="fa-regular fa-calendar"></i>${dateLabel(f.created_at)}</span>
+      </div>
+      <h3>${esc(d.name || d.value)}</h3>
+      <p class="desc">${esc(d.description || '')}</p>
+      ${price}
+      <div class="fact-links">
+        ${link(f.news_url, 'Читать новость', 'fa-newspaper', true)}
+        ${link(f.company_url, 'Сайт компании', 'fa-building')}
+        ${link(f.source_url, 'Сайт продукта', 'fa-arrow-up-right-from-square')}
+      </div>
+    </article>`;
+  }
+
+  function moving(values, size) {
+    return values.map((value, index) => {
+      const part = values.slice(Math.max(0, index - size + 1), index + 1);
+      return +(part.reduce((sum, item) => sum + item, 0) / part.length).toFixed(2);
+    });
+  }
+
+  function chart(days) {
+    const x = days.map(day => day.date);
+    const traces = Object.keys(series).map(type => ({
+      x: x,
+      y: days.map(day => day[type]),
+      type: 'bar',
+      name: series[type].label,
+      marker: { color: series[type].color },
+      hovertemplate: `%{x}<br>${series[type].label}: %{y}<extra></extra>`
+    }));
+    traces.push({
+      x: x,
+      y: moving(days.map(day => day.total), 7),
+      type: 'scatter',
+      mode: 'lines',
+      name: 'Среднее за 7 дней',
+      line: { color: '#181233', width: 2.5, shape: 'spline' },
+      hovertemplate: '%{x}<br>Среднее за 7 дней: %{y}<extra></extra>'
+    });
+    Plotly.newPlot('chart', traces, {
+      margin: { t: 10, r: 10, b: 42, l: 44 },
+      height: 330,
+      barmode: 'stack',
+      bargap: 0.32,
+      font: { family: 'Manrope, sans-serif', color: '#6f6a88', size: 12 },
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      yaxis: { title: '', rangemode: 'tozero', dtick: 1, gridcolor: '#eceaf7', zeroline: false },
+      xaxis: { tickformat: '%d %b', nticks: 10, gridcolor: '#eceaf7', zeroline: false },
+      legend: { orientation: 'h', y: 1.14, font: { size: 12 } },
+      hovermode: 'x unified',
+      hoverlabel: { bgcolor: '#fff', bordercolor: '#e7e5f4', font: { color: '#181233' } }
+    }, { displayModeBar: false, responsive: true });
+  }
+
+  async function load() {
+    const metrics = await (await fetch('/api/metrics')).json();
+    all.textContent = metrics.total_facts;
+    tools.textContent = metrics.total_tools;
+    updates.textContent = metrics.total_updates;
+    pricing.textContent = metrics.total_pricing;
+    chart(metrics.daily_stats);
+    const feed = await (await fetch('/api/facts?limit=5')).json();
+    facts.innerHTML = feed.facts.map(card).join('') || '<div class="empty"><i class="fa-regular fa-folder-open"></i>Событий пока нет.</div>';
+  }
+
+  load();
+</script>
+{% endblock %}

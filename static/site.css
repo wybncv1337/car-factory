@@ -1,0 +1,150 @@
+/* Дизайн-система AI News. Bootstrap даёт сетку и утилиты, этот файл — внешний вид. */
+
+:root {
+  --bg: #f3f3fb;
+  --surface: #ffffff;
+  --ink: #181233;
+  --muted: #6f6a88;
+  --line: #e7e5f4;
+  --brand: #6366f1;
+  --brand-2: #a21caf;
+  --tool: #6366f1;
+  --update: #16a34a;
+  --pricing: #d97706;
+  --radius: 18px;
+  --shadow: 0 12px 30px rgba(24, 18, 51, 0.08);
+  --shadow-lg: 0 18px 44px rgba(24, 18, 51, 0.13);
+}
+
+* { scrollbar-width: thin; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+h1, h2, h3, h4, h5, .display-number { font-family: "Space Grotesk", "Manrope", sans-serif; letter-spacing: -0.02em; }
+
+.page-shell { max-width: 1500px; margin: 0 auto; padding: 22px 22px 40px; }
+.layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 24px; align-items: start; }
+
+/* ── Сайдбар ─────────────────────────────────────────────── */
+.sidebar {
+  position: sticky; top: 22px;
+  background: linear-gradient(165deg, #4f46e5, #7c3aed 55%, #a21caf);
+  border-radius: 24px; padding: 20px 16px; color: #efeaff;
+  box-shadow: 0 22px 44px rgba(79, 70, 229, 0.28);
+  min-height: calc(100vh - 44px); display: flex; flex-direction: column;
+}
+.brand { display: flex; align-items: center; gap: 12px; padding: 6px 8px 18px; }
+.brand-logo { width: 40px; height: 40px; border-radius: 12px; background: rgba(255, 255, 255, 0.16); display: grid; place-items: center; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25); }
+.brand-logo img { width: 26px; height: 26px; display: block; }
+.brand-name { font-weight: 700; font-size: 19px; color: #fff; line-height: 1.1; }
+.brand-sub { font-size: 11.5px; color: #d9d2ff; letter-spacing: 0.06em; text-transform: uppercase; }
+.side-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #cfc5ff; padding: 14px 10px 6px; }
+.side-nav a { display: flex; align-items: center; gap: 11px; color: #e9e3ff; text-decoration: none; padding: 11px 12px; border-radius: 13px; margin: 3px 0; font-weight: 500; transition: background 0.16s, color 0.16s, transform 0.16s; }
+.side-nav a:hover { background: rgba(255, 255, 255, 0.14); color: #fff; transform: translateX(2px); }
+.side-nav a i { width: 18px; text-align: center; opacity: 0.85; }
+.side-nav a.active { background: #fff; color: #2c1a63; font-weight: 700; box-shadow: 0 10px 22px rgba(18, 8, 52, 0.28); }
+.side-nav a.active i { opacity: 1; color: var(--brand); }
+.side-note { margin-top: auto; font-size: 12px; line-height: 1.5; color: #ddd5ff; background: rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 12px 14px; }
+.side-note b { color: #fff; }
+
+/* ── Шапка страницы ──────────────────────────────────────── */
+.page-head { position: relative; overflow: hidden; border-radius: 24px; background: var(--surface); border: 1px solid var(--line); padding: 24px 26px; box-shadow: var(--shadow); margin-bottom: 20px; }
+.page-head::after { content: ""; position: absolute; inset: -120px -60px auto auto; width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, rgba(99, 102, 241, 0.22), rgba(162, 28, 175, 0.12) 45%, transparent 70%); }
+.page-head h1 { font-size: 27px; margin: 0 0 6px; position: relative; z-index: 1; }
+.page-head p { margin: 0; color: var(--muted); max-width: 720px; position: relative; z-index: 1; }
+.eyebrow { font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand); font-weight: 700; margin-bottom: 8px; }
+.eyebrow a { color: inherit; }
+.eyebrow a:hover { color: var(--brand-2); }
+
+/* ── Плитки метрик ───────────────────────────────────────── */
+.stat { position: relative; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 18px 16px; box-shadow: var(--shadow); height: 100%; transition: transform 0.18s, box-shadow 0.18s; }
+.stat:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+.stat::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--tone, var(--brand)); }
+.stat-icon { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: #f1f0fb; background: color-mix(in srgb, var(--tone, var(--brand)) 12%, #fff); color: var(--tone, var(--brand)); font-size: 15px; margin-bottom: 12px; }
+.stat-value { font-family: "Space Grotesk", sans-serif; font-size: 34px; font-weight: 700; line-height: 1; margin-bottom: 6px; }
+.stat-label { color: var(--muted); font-size: 13px; font-weight: 600; }
+
+/* ── Панели ──────────────────────────────────────────────── */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow); }
+.panel-head { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.panel-head h2 { font-size: 18px; margin: 0; }
+.panel-head .hint { color: var(--muted); font-size: 13px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 6px; padding: 0; list-style: none; }
+.legend li { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.legend span { width: 11px; height: 11px; border-radius: 4px; background: var(--tone); }
+.section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin: 26px 0 14px; }
+.section-title h2 { font-size: 20px; margin: 0; }
+.section-title a { font-size: 13.5px; font-weight: 700; color: var(--brand); text-decoration: none; }
+.section-title a:hover { text-decoration: underline; }
+
+/* ── Карточка события ────────────────────────────────────── */
+.fact-card { --tone: var(--brand); position: relative; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--tone); border-radius: var(--radius); padding: 17px 19px; margin-bottom: 14px; box-shadow: var(--shadow); transition: transform 0.16s, box-shadow 0.16s; }
+.fact-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.fact-card.is-tool { --tone: var(--tool); }
+.fact-card.is-update { --tone: var(--update); }
+.fact-card.is-pricing { --tone: var(--pricing); }
+.fact-top { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-bottom: 10px; }
+.type-badge { font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--tone); background: #f4f3fd; background: color-mix(in srgb, var(--tone) 12%, #fff); border-radius: 999px; padding: 4px 11px; }
+.chip { font-size: 12.5px; color: var(--muted); background: #f6f5fd; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; font-weight: 600; }
+.chip i { margin-right: 6px; color: var(--tone); }
+a.chip { text-decoration: none; color: var(--ink); transition: border-color 0.15s, color 0.15s; }
+a.chip:hover { border-color: var(--brand); color: var(--brand); }
+.fact-date { margin-left: auto; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.fact-date i { margin-right: 6px; color: var(--tone); }
+.fact-card h3 { font-size: 17px; margin: 0 0 7px; }
+.fact-card .desc { color: var(--muted); margin: 0 0 12px; line-height: 1.55; }
+.price-note { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ink); background: #f6f5fd; border: 1px solid var(--line); border-radius: 10px; padding: 6px 11px; margin-bottom: 12px; }
+.price-note i { color: var(--tone); }
+.fact-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.link-btn { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #3b3364; background: #f7f6fd; border: 1px solid var(--line); border-radius: 11px; padding: 7px 13px; text-decoration: none; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+.link-btn:hover { background: var(--brand); border-color: var(--brand); color: #fff; }
+.link-btn.primary { background: #eceafd; border-color: #dcd8fb; color: #3f2f8f; }
+.link-btn i { font-size: 12px; }
+
+/* ── Формы и список разработчиков ────────────────────────── */
+.form-control, .form-select { border-radius: 12px; border-color: var(--line); padding: 10px 13px; font-size: 14px; }
+.form-control:focus, .form-select:focus { border-color: var(--brand); box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.16); }
+.form-label { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.btn-primary { background: linear-gradient(135deg, var(--brand), var(--brand-2)); border: 0; border-radius: 12px; padding: 10px 18px; font-weight: 700; box-shadow: 0 10px 22px rgba(99, 102, 241, 0.28); }
+.btn-primary:hover { filter: brightness(1.06); }
+
+.dev-card { display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 17px 19px; height: 100%; box-shadow: var(--shadow); text-decoration: none; color: var(--ink); transition: transform 0.16s, box-shadow 0.16s, border-color 0.16s; }
+.dev-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: #d8d3f6; color: var(--ink); }
+.dev-avatar { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 17px; color: #fff; background: linear-gradient(140deg, var(--brand), var(--brand-2)); flex: 0 0 auto; }
+.dev-card h3 { font-size: 16px; margin: 0; }
+.dev-card .dev-sub { font-size: 12.5px; color: var(--muted); }
+
+.rank-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.rank-row:last-child { border-bottom: 0; }
+.rank-pos { width: 26px; height: 26px; border-radius: 9px; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: #f1effc; color: #4b3fa8; flex: 0 0 auto; }
+.rank-row a { font-weight: 700; color: var(--ink); text-decoration: none; }
+.rank-row a:hover { color: var(--brand); }
+.rank-count { margin-left: auto; font-family: "Space Grotesk", sans-serif; font-weight: 700; color: var(--muted); }
+
+.empty { text-align: center; color: var(--muted); padding: 30px 18px; background: #faf9ff; border: 1px dashed var(--line); border-radius: var(--radius); }
+.empty i { font-size: 22px; color: #c9c3ea; display: block; margin-bottom: 10px; }
+
+/* ── Адаптив ─────────────────────────────────────────────── */
+@media (max-width: 991px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { position: static; min-height: 0; flex-direction: row; align-items: center; gap: 14px; overflow-x: auto; padding: 14px 16px; border-radius: 20px; }
+  .brand { padding: 0; flex: 0 0 auto; }
+  .side-label, .side-note { display: none; }
+  .side-nav { display: flex; gap: 6px; }
+  .side-nav a { margin: 0; padding: 9px 13px; white-space: nowrap; }
+  .side-nav a:hover { transform: none; }
+  .stat-value { font-size: 28px; }
+}
+
+@media (max-width: 575px) {
+  .page-shell { padding: 14px 14px 30px; }
+  .page-head { padding: 18px; }
+  .page-head h1 { font-size: 22px; }
+  .fact-date { margin-left: 0; width: 100%; }
+}
