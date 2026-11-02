@@ -1,4 +1,4 @@
-"""AI Radar — веб-приложение для мониторинга ИИ-инструментов."""
+"""НейроРадар — веб-приложение для мониторинга ИИ-инструментов."""
 
 import json
 import sqlite3
@@ -21,7 +21,7 @@ def get_db():
 
 
 def init_db():
-    """Создаёт отдельную базу AI Radar и наполняет её демонстрационными карточками."""
+    """Создаёт базу НейроРадара и добавляет недостающие демонстрационные карточки."""
     with get_db() as conn:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS facts (
@@ -33,8 +33,6 @@ def init_db():
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
         """)
-        if conn.execute("SELECT COUNT(*) FROM facts").fetchone()[0]:
-            return
         now = datetime.now()
         demo_facts = [
             ("tool", {"name": "ChatGPT", "developer": "OpenAI", "category": "Текст и анализ", "description": "Помогает составлять тексты, анализировать документы и искать идеи.", "price": "Есть бесплатный тариф", "value": "ChatGPT — ИИ-помощник для текста, анализа и рабочих задач."}, "https://chatgpt.com", 0),
@@ -43,8 +41,25 @@ def init_db():
             ("update", {"name": "Обновление генерации изображений", "developer": "Adobe", "category": "Дизайн", "description": "Добавлены более точные настройки стиля и редактирование отдельных областей изображения.", "value": "Adobe обновила функции ИИ-генерации изображений."}, "https://www.adobe.com", 3),
             ("pricing", {"name": "Изменение лимитов", "developer": "Notion", "category": "Продуктивность", "description": "Обновлены лимиты использования ИИ-функций в рабочих пространствах.", "price": "Проверьте условия своего тарифа", "value": "Notion изменила лимиты ИИ-функций в тарифах."}, "https://www.notion.so", 4),
             ("update", {"name": "Новая функция транскрибации", "developer": "Zoom", "category": "Встречи", "description": "ИИ автоматически делает краткое содержание разговора и список задач.", "value": "Zoom добавил ИИ-резюме встреч и задачи."}, "https://www.zoom.com", 5),
+            ("tool", {"name": "Claude", "developer": "Anthropic", "category": "Текст и анализ", "description": "Помогает работать с большими текстами, документами и структурированием информации.", "price": "Есть бесплатный тариф", "value": "Claude — ИИ-ассистент для анализа документов и работы с текстом."}, "https://claude.ai", 6),
+            ("tool", {"name": "Gemini", "developer": "Google", "category": "Текст и мультимедиа", "description": "ИИ-помощник Google для работы с текстом, изображениями и задачами.", "price": "Есть бесплатный тариф", "value": "Gemini — мультимодальный ИИ-помощник от Google."}, "https://gemini.google.com", 7),
+            ("tool", {"name": "Microsoft Copilot", "developer": "Microsoft", "category": "Продуктивность", "description": "Помощник для рабочих задач и приложений Microsoft.", "price": "Зависит от тарифа Microsoft 365", "value": "Microsoft Copilot — ИИ-помощник для рабочих задач."}, "https://copilot.microsoft.com", 8),
+            ("tool", {"name": "Perplexity", "developer": "Perplexity", "category": "Поиск и анализ", "description": "Поисковый ИИ-сервис с ответами и ссылками на источники.", "price": "Есть бесплатный тариф", "value": "Perplexity — ИИ-поиск с источниками."}, "https://www.perplexity.ai", 9),
+            ("tool", {"name": "Midjourney", "developer": "Midjourney", "category": "Изображения", "description": "Генерирует иллюстрации и визуальные концепты по текстовому описанию.", "price": "Платная подписка", "value": "Midjourney — генератор изображений по тексту."}, "https://www.midjourney.com", 10),
+            ("tool", {"name": "Runway", "developer": "Runway", "category": "Видео", "description": "Помогает создавать и редактировать видео с помощью ИИ.", "price": "Есть бесплатный тариф", "value": "Runway — ИИ-инструмент для создания видео."}, "https://runwayml.com", 11),
+            ("tool", {"name": "ElevenLabs", "developer": "ElevenLabs", "category": "Аудио", "description": "Создаёт реалистичную озвучку и синтез речи.", "price": "Есть бесплатный тариф", "value": "ElevenLabs — ИИ-сервис для генерации голоса."}, "https://elevenlabs.io", 12),
+            ("tool", {"name": "Hugging Face", "developer": "Hugging Face", "category": "Разработка", "description": "Платформа с открытыми моделями, датасетами и инструментами для разработчиков.", "price": "Есть бесплатные возможности", "value": "Hugging Face — платформа для работы с ИИ-моделями."}, "https://huggingface.co", 13),
+            ("tool", {"name": "Le Chat", "developer": "Mistral AI", "category": "Текст и анализ", "description": "Чат-ассистент для работы с текстом и повседневными задачами.", "price": "Есть бесплатный тариф", "value": "Le Chat — ИИ-ассистент от Mistral AI."}, "https://chat.mistral.ai", 14),
+            ("tool", {"name": "Grok", "developer": "xAI", "category": "Текст и анализ", "description": "ИИ-ассистент для ответов на вопросы и работы с информацией.", "price": "Зависит от тарифа сервиса", "value": "Grok — ИИ-ассистент от xAI."}, "https://grok.com", 15),
+            ("tool", {"name": "Figma AI", "developer": "Figma", "category": "Дизайн", "description": "Помогает создавать интерфейсы, тексты и визуальные элементы в Figma.", "price": "Зависит от тарифа Figma", "value": "Figma AI — ИИ-функции для проектирования интерфейсов."}, "https://www.figma.com", 16),
+            ("tool", {"name": "Grammarly", "developer": "Grammarly", "category": "Текст", "description": "Проверяет и улучшает англоязычные тексты, письма и документы.", "price": "Есть бесплатный тариф", "value": "Grammarly — ИИ-помощник для редактирования текста."}, "https://www.grammarly.com", 17),
+            ("tool", {"name": "YandexGPT", "developer": "Яндекс", "category": "Текст и анализ", "description": "Русскоязычная языковая модель для генерации и обработки текста.", "price": "Доступность зависит от сервиса", "value": "YandexGPT — русскоязычная ИИ-модель от Яндекса."}, "https://yandex.ru/project/yandexgpt", 18),
+            ("tool", {"name": "GigaChat", "developer": "Сбер", "category": "Текст и анализ", "description": "Российский ИИ-ассистент для общения, генерации текста и рабочих задач.", "price": "Условия зависят от сервиса", "value": "GigaChat — ИИ-ассистент от Сбера."}, "https://developers.sber.ru/portal/products/gigachat", 19),
         ]
         for fact_type, data, url, days_ago in demo_facts:
+            exists = conn.execute("SELECT 1 FROM facts WHERE fact_data LIKE ?", (f'%"name": "{data["name"]}"%',)).fetchone()
+            if exists:
+                continue
             created_at = (now - timedelta(days=days_ago)).strftime("%Y-%m-%d %H:%M:%S")
             conn.execute("INSERT INTO facts (type, fact_data, confidence, source_url, created_at) VALUES (?, ?, ?, ?, ?)", (fact_type, json.dumps(data, ensure_ascii=False), 0.9, url, created_at))
 

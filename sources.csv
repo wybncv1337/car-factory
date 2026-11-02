@@ -1,8 +1,16 @@
 developer,type,url,name
 OpenAI,html,https://openai.com/news/,Новости OpenAI
-Google,html,https://blog.google/technology/ai/,Google AI Blog
 Anthropic,html,https://www.anthropic.com/news,Новости Anthropic
+Google,html,https://blog.google/technology/ai/,Google AI Blog
 Microsoft,html,https://blogs.microsoft.com/blog/tag/ai/,Microsoft AI Blog
 Adobe,html,https://blog.adobe.com/en/topics/ai,Adobe AI Blog
 Canva,html,https://www.canva.com/newsroom/,Новости Canva
+GitHub,html,https://github.blog/category/ai/,GitHub AI Blog
 Hugging Face,html,https://huggingface.co/blog,Hugging Face Blog
+Mistral AI,html,https://mistral.ai/news/,Новости Mistral AI
+Runway,html,https://runwayml.com/news/,Новости Runway
+ElevenLabs,html,https://elevenlabs.io/blog,ElevenLabs Blog
+Figma,html,https://www.figma.com/blog/,Figma Blog
+Grammarly,html,https://www.grammarly.com/blog/,Grammarly Blog
+Яндекс,html,https://yandex.ru/company/press_releases/,Новости Яндекса
+Сбер,html,https://developers.sber.ru/portal/products/gigachat,GigaChat
